@@ -4,17 +4,19 @@
 
 圖例:✅ 適合 / ⚠️ 可做但有取捨 / ❌ 非 Streamlit 原生能力
 
+> **前提**(見 [ADR 0002](../decisions/0002-streamlit-as-api-client.md)):所有資料存取一律透過 **FastAPI REST API**,Streamlit 不直接連 DB。下表「可行性」指前端**呈現與互動**;DB 讀寫、雜湊、聚合等由後端負責。
+
 ---
 
 ## 2. 資料管理模組 — 幾乎全部 ✅
 
 | 項目 | 可行性 | 說明 |
 |---|---|---|
-| 建立資料(標題/數值/分類/時間戳) | ✅ | `st.form` + 寫入 DB(SQLite/Postgres) |
-| 讀取(分頁、篩選、排序) | ✅ | `st.dataframe` 內建排序;分頁/篩選用 pandas 或 SQL query |
-| 更新(限創建者/Admin) | ✅ | 權限判斷在 Python 端,`st.session_state` 存登入者角色 |
-| 刪除(限創建者/Admin) | ✅ | 同上 |
-| 批量匯入 CSV/JSON | ✅ | `st.file_uploader` + `pandas.read_csv/json` |
+| 建立資料(標題/數值/分類/時間戳) | ✅ | `st.form` → 呼叫後端建立 API |
+| 讀取(分頁、篩選、排序) | ✅ | `st.dataframe` 呈現;分頁/篩選以 API 查詢參數(page/size/filter) |
+| 更新(限創建者/Admin) | ✅ | 呼叫後端更新 API;權限由後端強制,前端依角色控制按鈕 |
+| 刪除(限創建者/Admin) | ✅ | 呼叫後端刪除 API |
+| 批量匯入 CSV/JSON | ✅ | `st.file_uploader` + `pandas` 解析 → 送批量建立 API |
 
 ## 3. 即時監控模組 — 需注意 WebSocket 限制 ⚠️
 
@@ -53,6 +55,6 @@
 
 - **可以做**:第 2、4、5 模組完整可做;第 3 模組的生成器、圖表更新、告警也可做。
 - **唯一真正限制**:第 3 模組的 **WebSocket 推送**。Streamlit 無原生伺服器推送,僅能以定時輪詢/fragment 模擬即時效果。
-- 若需真正 WebSocket,建議採 **FastAPI(WebSocket + 即時資料生成)+ Streamlit(UI/查詢/分析)** 共用同一 DB 的架構。
+- 若需真正 WebSocket,建議採 **FastAPI(WebSocket + 即時資料生成 + REST)+ Streamlit(純 API Client)** 的架構,由 FastAPI 統一存取 DB(見 [ADR 0002](../decisions/0002-streamlit-as-api-client.md))。
 
 架構詳見 [技術架構](../architecture.md)。

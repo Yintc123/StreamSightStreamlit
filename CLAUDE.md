@@ -6,7 +6,7 @@
 
 ## 專案概觀
 
-StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 6 頁多頁面架構，依登入角色動態註冊；即時監控可連後端 FastAPI WebSocket。
+StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 6 頁多頁面架構，依登入角色動態註冊。**Streamlit 為純前端 / API Client，不直接連 DB**：所有資料存取（含認證、CRUD、分析、系統管理）一律透過 `lib/api_client.py` 呼叫 FastAPI（StreamSightBackend）REST API；即時監控連後端 FastAPI WebSocket（見 [ADR 0002](docs/decisions/0002-streamlit-as-api-client.md)）。
 
 - 語言：Python 3.11+ ／ 套件管理：`pip` + `requirements.txt`（虛擬環境 `.venv`）
 - 框架：Streamlit
@@ -105,8 +105,9 @@ pages/
 ├── analytics.py           # 5. 資料分析
 └── admin.py               # 6. 系統管理（僅 Admin 註冊）
 lib/
-├── auth.py                # 認證 / 角色 helper（純邏輯，優先測試）
-├── state.py               # session_state helper
+├── api_client.py          # FastAPI REST 呼叫封裝（帶 JWT、逾時 / 錯誤處理）
+├── auth.py                # 認證 / 角色 helper（呼叫後端取 JWT，不碰 DB）
+├── state.py               # session_state helper（存 token / 角色）
 └── theme.py               # load_css() 樣式載入
 styles/main.css            # 共用自訂 CSS
 .streamlit/config.toml     # 主題（顏色 / 字型）
@@ -120,6 +121,8 @@ docs/                      # 架構與頁面 / 樣式規格
 
 ## 慣例與注意事項
 
+- **不直接連 DB**：所有資料存取一律經 `lib/api_client.py` 呼叫 FastAPI；前端不持有 DB 連線、不寫 SQL、不自行雜湊密碼。測試以 mock API Client 進行。
+- **認證走後端**：登入 / 註冊呼叫 FastAPI 取得 JWT，存 `st.session_state`；不使用 `streamlit-authenticator`。
 - **邏輯不寫在頁面裡**：可測試的邏輯放 `lib/`，頁面只負責排版與呼叫。
 - **存取控制**：角色存於 `st.session_state`；非 Admin **動態不註冊**系統管理頁（比隱藏連結安全），此行為需有測試覆蓋。
 - **樣式**：遵循[設計系統規格](docs/specs/design-system.md)——能用 `config.toml` 主題解決就不寫 CSS；CSS 集中於 `styles/main.css`，於進入點載入一次。

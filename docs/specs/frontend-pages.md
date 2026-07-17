@@ -15,7 +15,7 @@ Streamlit 前端切分為 6 個頁面,以 `st.navigation` + `st.Page` 組成,並
 
 ## 存取控制
 
-- 登入後角色存於 `st.session_state`。
+- 登入後 JWT 與角色存於 `st.session_state`;角色由後端 token / `/me` 取得。
 - 未登入時只註冊「登入 / 註冊」頁面。
 - 非 Admin 時**動態不註冊**「系統管理」頁面(比隱藏連結更安全)。
 - 頁面內以 `st.tabs` 再分子功能。
@@ -31,9 +31,12 @@ pages/
 ├── analytics.py              # 5. 資料分析
 └── admin.py                  # 6. 系統管理(僅 Admin 註冊)
 lib/
-├── auth.py                   # 認證 / 角色 helper
-└── state.py                  # session_state helper
+├── api_client.py             # FastAPI REST 呼叫封裝(帶 JWT、逾時 / 錯誤處理)
+├── auth.py                   # 認證 / 角色 helper(呼叫後端取得 JWT,不碰 DB)
+└── state.py                  # session_state helper(存 token / 角色)
 ```
+
+> **資料存取原則**(見 [ADR 0002](../decisions/0002-streamlit-as-api-client.md)):所有頁面的資料存取一律透過 `lib/api_client.py` 呼叫 FastAPI,**Streamlit 不直接連 DB**。
 
 ## 相關文件
 
@@ -41,3 +44,4 @@ lib/
 - [設計系統 / 樣式規格](design-system.md)
 - [功能能力對照](feature-capability.md)
 - [ADR 0001:即時架構](../decisions/0001-realtime-architecture.md)
+- [ADR 0002:Streamlit 為 API Client,不直接連 DB](../decisions/0002-streamlit-as-api-client.md)
