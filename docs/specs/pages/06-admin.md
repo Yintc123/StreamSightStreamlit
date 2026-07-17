@@ -67,7 +67,7 @@
 
 ## 資料
 
-- users 表、logs 表、records / realtime 表(唯讀查詢)。
+- 透過後端**管理 API** 存取 users / logs / records / realtime;前端不直接連 DB。敏感操作(停用帳號、角色變更)呼叫對應 API,由後端寫稽核日誌。
 
 ## 權限規則
 

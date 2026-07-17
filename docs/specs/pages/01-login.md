@@ -51,8 +51,8 @@
 
 ### 登入
 - 欄位:帳號(text)、密碼(password)。
-- 驗證:查使用者表,密碼比對(雜湊)。
-- 成功:寫入 `session_state`(`authenticated`、`username`、`role`),導向儀表板。
+- 驗證:呼叫後端認證 API(Argon2 比對),前端不查 DB、不雜湊。
+- 成功:後端回傳 JWT → 寫入 `session_state`(`token`、`username`、`role`),導向儀表板。
 - 失敗:顯示「帳號或密碼錯誤」,不透露是帳號或密碼哪個錯。
 
 ### 註冊
@@ -63,7 +63,7 @@
 
 ## 資料
 
-- users 表:`id, username(唯一), password_hash, email, role, created_at`。
+- users 表由**後端**擁有:`id, username(唯一), password_hash, email, role, created_at`;前端僅透過認證 API 存取,不直接連 DB。
 - 角色:`user` / `admin`。
 
 ## 狀態與錯誤處理
@@ -73,5 +73,5 @@
 
 ## 依賴 / 備註
 
-- 認證方案:`streamlit-authenticator` 或原生 `st.login`(OIDC),待 [ADR](../../decisions/) 決定。
-- 密碼必須雜湊儲存(如 bcrypt),不得明文。
+- 認證走 **FastAPI 認證 API**(見 [ADR 0002](../../decisions/0002-streamlit-as-api-client.md)):登入 / 註冊呼叫後端端點,取得 JWT 存於 `st.session_state`。
+- 前端**不使用 `streamlit-authenticator`、不自行雜湊密碼**;密碼雜湊(Argon2)由後端負責。

@@ -51,7 +51,7 @@
 
 ### 告警
 - 閾值設定:上限 / 下限(可由使用者調整,Admin 可設全域預設)。
-- 超閾值時:圖上標記 + `st.toast`/`st.warning` + 寫入告警表。
+- 閾值變更透過 API 送後端;超閾值判斷與告警寫入由後端負責,前端顯示圖上標記 + `st.toast`/`st.warning`。
 - 告警列表:時間、分類、數值、觸發閾值、狀態。
 
 ## 即時資料流
@@ -64,7 +64,7 @@
 
 ## 資料
 
-- 即時資料落地:records / realtime 表。
+- 即時資料與告警由**後端**擁有並落地(records / realtime、alerts 表);前端經 WebSocket 接收即時串流、經 REST API 讀取告警列表與變更閾值,不直接連 DB。
 - alerts 表:`id, category, value, threshold, triggered_at, status`。
 
 ## 狀態與錯誤處理

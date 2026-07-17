@@ -51,7 +51,7 @@
 ### 列表(讀取)
 - `st.dataframe` 顯示資料,支援欄位排序。
 - 篩選:分類、時間範圍、關鍵字(標題)。
-- 分頁:每頁 N 筆,提供頁碼控制(SQL `LIMIT/OFFSET`)。
+- 分頁:每頁 N 筆,頁碼控制透過 API 查詢參數(`page` / `size`),由後端分頁。
 - 每列提供「編輯」「刪除」動作;非創建者且非 Admin 時停用。
 
 ### 新增(建立)
@@ -76,7 +76,7 @@
 
 ## 資料
 
-- records 表:`id, title, value, category, created_by, created_at, updated_at`。
+- records 由**後端**擁有:`id, title, value, category, created_by, created_at, updated_at`;前端經 CRUD API 存取,不直接連 DB。
 
 ## 權限規則
 
@@ -93,4 +93,4 @@
 
 ## 依賴 / 備註
 
-- 大量資料建議以 SQL 端分頁/篩選,避免全載入前端。
+- 大量資料以 **API 查詢參數**(page / size / filter)在後端分頁/篩選,避免全載入前端。
