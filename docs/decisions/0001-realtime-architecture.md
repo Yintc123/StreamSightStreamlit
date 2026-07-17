@@ -1,6 +1,6 @@
 # ADR 0001:即時監控採 Streamlit + FastAPI(WebSocket 推送)
 
-- 狀態:已採用
+- 狀態:已採用(資料存取分工已由 [ADR 0002](0002-streamlit-as-api-client.md) 修正:Streamlit 改為純 API Client,不再直接連 DB)
 - 日期:2026-07-18
 
 ## 背景
