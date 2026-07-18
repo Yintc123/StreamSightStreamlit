@@ -188,12 +188,12 @@ def build_pages(role: str) -> list:
 | `lib/config.py` | 讀環境旗標與設定(`DATA_SOURCE`/`AUTH_MODE`、BFF/API base URL、cookie 名、逾時) | 本檔 §2、auth-flow §6 | ✅ |
 | `lib/theme.py` | `load_css()` 載入樣式 | [設計系統](design-system.md) | ✅ |
 | `lib/state.py` | `session_state` 讀寫 helper(見 §7 契約) | auth-flow §6 | ✅ |
-| `lib/auth.py` | `resolve_actor()` 身分解析(mock/bff 出口)、role 映射 | [認證流程](auth-flow.md) | ✅ |
+| `lib/auth.py` | `resolve_actor()` 身分解析(mock/bff 出口)、role 映射;對 api_client 的接縫 `get_access_token()`/`refresh_token()`/`raw_cookie()` | [認證流程](auth-flow.md) | ✅ |
 | `lib/nav.py` | `build_pages(role)`、`render_dev_switcher()`、導向登入 helper | 本檔 §5、auth-flow §4.4 | ✅ |
 | `lib/models.py` | `Actor`/`Record`/`Page`/`ImportResult`、`CATEGORIES`、`can_edit()`、例外 | [資料來源](data-source.md) | ✅ |
 | `lib/data_source.py` | `DataSource`(Protocol)+ `get_data_source()` 工廠 | [資料來源](data-source.md) | ✅ |
 | `lib/mock_data_source.py` | `MockDataSource`(記憶體種子) | [資料來源](data-source.md) | ✅ |
-| `lib/api_client.py` | `ApiDataSource` + BFF/FastAPI 呼叫(帶 JWT) | auth-flow §6、data-source | ⬜(接 API 階段) |
+| `lib/api_client.py` | `ApiDataSource` + BFF/FastAPI 呼叫(帶 JWT)、`ApiError`、逾時/重試 | [API Client](api-client.md) | ⬜(接 API 階段) |
 | `lib/request_id.py` | 對外呼叫的 `X-Request-ID` 關聯 ID(產生/附掛/讀回) | [Request ID 模組](request-id.md) | ⬜(接 API 階段) |
 
 ---

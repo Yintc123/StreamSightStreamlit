@@ -171,7 +171,7 @@ flowchart LR
 - [x] **實作分段**:純模組(測 1–7)現在可實作;整合(測 8–11)gated on `lib/api_client.py`(含 `ApiError`)規格。
 - [ ] **Header 名稱對齊**:BFF 與 FastAPI 是否使用 `X-Request-ID`(而非 `X-Correlation-ID` 等)?需與後端 / 前端團隊確認,並確保下游**原樣傳播 + 記 log**。
 - [ ] **下游是否已生成**:若 BFF / FastAPI 已有自己的 request-id 機制,釐清「Streamlit 生成、下游沿用」還是「以下游為準」;預設採**前者**(Streamlit 為源頭),並以 `with_request_id` 的「不覆寫既有」承接上游值。
-- [ ] `ApiError` 的完整欄位與 `lib/api_client.py` 整體契約(HTTP client 選 `httpx`/`requests`、逾時、重試)——另於 api_client 規格定義。
+- [x] `ApiError` 的完整欄位與 `lib/api_client.py` 整體契約(httpx 選型、逾時、重試、401 refresh)——已定於 [API Client 規格](api-client.md)(§3、§4、§5);整合測 8–11 據此可實作。
 
 ---
 

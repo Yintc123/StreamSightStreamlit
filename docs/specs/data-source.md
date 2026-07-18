@@ -5,6 +5,7 @@
 - 適用頁面:[資料管理](pages/03-data-management.md)(可擴及其他 CRUD 頁)
 - 前提架構:[ADR 0002](../decisions/0002-streamlit-as-api-client.md)(Streamlit 為 API Client,不直接連 DB)
 - 上層骨架:[應用骨架 / 基礎架構](app-skeleton.md)(`get_data_source()` 由 `DATA_SOURCE` 旗標切換,身分 `Actor` 由骨架 `resolve_actor()` 提供)
+- 真實實作:[API Client 規格](api-client.md)(`ApiDataSource` 實作本介面、REST 端點對應、錯誤映射)
 - 相關:[前端頁面結構](frontend-pages.md)、[設計系統](design-system.md)
 
 ---
