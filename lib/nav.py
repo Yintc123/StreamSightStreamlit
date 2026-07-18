@@ -9,6 +9,16 @@ from typing import List
 
 import streamlit as st
 
+from lib import state
+from lib.models import Actor
+
+# 開發用切換器選項(僅 mock;換真實 API 後移除)。見 data-source §開發用切換器。
+_DEV_ACTORS = [
+    ("Alice(一般)", Actor("alice", "user")),
+    ("Bob(一般)", Actor("bob", "user")),
+    ("Admin", Actor("admin", "admin")),
+]
+
 
 def build_pages(role: str) -> List:
     """依角色回傳 st.Page 清單;僅 admin 追加系統管理頁。"""
@@ -21,3 +31,18 @@ def build_pages(role: str) -> List:
     if role == "admin":
         pages.append(st.Page("pages/admin.py", title="系統管理"))
     return pages
+
+
+def render_dev_switcher(actor: Actor) -> Actor:
+    """側邊欄開發用使用者切換器(僅 AUTH_MODE=mock);回傳當前生效的 Actor 並寫回 session。"""
+    labels = [label for label, _ in _DEV_ACTORS]
+    current = next(
+        (label for label, a in _DEV_ACTORS if a.username == actor.username),
+        labels[0],
+    )
+    choice = st.sidebar.selectbox(
+        "目前使用者", labels, index=labels.index(current), key="dev_user"
+    )
+    chosen = next(a for label, a in _DEV_ACTORS if label == choice)
+    state.set_actor(chosen)
+    return chosen

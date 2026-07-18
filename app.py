@@ -6,7 +6,8 @@
 import streamlit as st
 
 from lib.auth import resolve_actor
-from lib.nav import build_pages
+from lib.config import get_settings
+from lib.nav import build_pages, render_dev_switcher
 from lib.theme import load_css
 
 st.set_page_config(
@@ -21,6 +22,9 @@ actor = resolve_actor()  # ③ 身分解析(mock/bff 單一出口)
 if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 只註冊導向頁
     st.navigation([st.Page("pages/gate.py", title="登入")]).run()
     st.stop()
+
+if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)
+    actor = render_dev_switcher(actor)
 
 pages = build_pages(actor.role)  # ⑥ 依 role 動態組頁清單
 st.navigation(pages).run()  # ⑦ 交給 Streamlit 路由
