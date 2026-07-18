@@ -1,0 +1,7 @@
+# 主題設定(見 docs/specs/design-system.md 設計 Token)
+[theme]
+primaryColor = "#2563eb"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f1f5f9"
+textColor = "#0f172a"
+font = "sans serif"
