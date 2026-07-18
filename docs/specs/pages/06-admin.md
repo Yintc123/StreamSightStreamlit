@@ -140,14 +140,14 @@ metric_cards([
 
 ## Mock 模式行為（`DATA_SOURCE=mock`）
 
-> **重要**:`MockDataSource` 目前**只支援 records CRUD**,不含 users / logs / db-status。本頁 mock 階段的管理資料由 `lib/admin.py`(新增)的**靜態種子 + 純函式**提供,不呼叫網路;換 `DATA_SOURCE=api` 後才改打管理 API。此為本頁能在 mock 先行下完整呈現與測試的前提。
+> **重要**:`MockDataSource` 目前**只支援 records CRUD**,不含 users / logs / db-status。本頁 mock 階段的管理資料由 `lib/system_management.py`(新增)的**靜態種子 + 純函式**提供,不呼叫網路;換 `DATA_SOURCE=api` 後才改打管理 API。此為本頁能在 mock 先行下完整呈現與測試的前提。
 
 | 分頁 | Mock 資料來源 | Mock 寫入行為 |
 |---|---|---|
 | 使用者 | 首次進頁由 `seed_users()` 植入 `st.session_state["admin_users"]`;之後恆讀此 list | 停用/啟用:**就地改 `admin_users` 內對應 dict 的 `status`** + `st.toast` + `st.rerun()`;不落持久層 |
 | 權限 | 同上 `admin_users` list | 變更 grade:先過 `is_last_super_admin(admin_users, target)` 擋降級最後一位 → 就地改該 dict 的 `grade`;否則 `st.error` |
-| 日誌 | `lib/admin.py::seed_logs()` 靜態假日誌(含 INFO/WARNING/ERROR) | 唯讀,無寫入 |
-| DB 狀態 | `lib/admin.py::seed_db_status()` 靜態假指標(連線正常、表列數、DB 大小) | 唯讀,無寫入 |
+| 日誌 | `lib/system_management.py::seed_logs()` 靜態假日誌(含 INFO/WARNING/ERROR) | 唯讀,無寫入 |
+| DB 狀態 | `lib/system_management.py::seed_db_status()` 靜態假指標(連線正常、表列數、DB 大小) | 唯讀,無寫入 |
 
 - **可變狀態單一真相**:mock 的使用者名單只存於 `st.session_state["admin_users"]`（見 §session_state 契約）;所有寫入就地改這個 list,`seed_users()` 只在 `setdefault` 首次植入,不在每次 rerun 重置（否則改動會被沖掉）。
 - mock 模式下**不需登入 BFF** 亦可完整呈現(讀取全開);`viewer` 身分下所有寫入按鈕停用,可直接以 AppTest 驗證。
@@ -155,7 +155,7 @@ metric_cards([
 
 ---
 
-## `lib/admin.py` 純函式契約（單一真相）
+## `lib/system_management.py` 純函式契約（單一真相）
 
 所有函式**無 Streamlit 依賴**,可直接單元測試。
 
@@ -166,7 +166,7 @@ metric_cards([
 | `format_db_size` | `(size_bytes: int) -> str` | 位元組 → `"{:.1f} MB"`(或適當單位)字串;`0 → "0.0 MB"`。 |
 | `seed_users` / `seed_logs` / `seed_db_status` | `() -> list` / `() -> list` / `() -> dict` | mock 靜態種子;決定性、不依賴時鐘。 |
 
-> 寫入權限判斷用 `lib/models.py::can_write(actor)`(見 [Auth / models 契約]),本頁與資料管理**共用同一條 `grade != "viewer"`**,不在 `lib/admin.py` 另立。
+> 寫入權限判斷用 `lib/models.py::can_write(actor)`(見 [Auth / models 契約]),本頁與資料管理**共用同一條 `grade != "viewer"`**,不在 `lib/system_management.py` 另立。
 
 ---
 
@@ -227,21 +227,21 @@ metric_cards([
 | `lib/errors.py` | `render_error` |
 | `lib/state.py` | `get_actor()`（取當前 actor 判斷 `can_write`）|
 | `lib/models.py` | `can_write(actor)`（寫入 gate,與資料管理共用）|
-| `lib/admin.py` | `color_log_level`、`is_last_super_admin`、`format_db_size`、mock 種子（新增）|
+| `lib/system_management.py` | `color_log_level`、`is_last_super_admin`、`format_db_size`、mock 種子（新增）|
 | `lib/api_client.py` | `DATA_SOURCE=api` 時管理 API 所有讀寫呼叫 |
 
 ---
 
 ## 可測試性 / TDD
 
-### 純函式（`tests/unit/test_admin.py`）
+### 純函式（`tests/unit/test_system_management.py`）
 
 1. `color_log_level("ERROR")` — 回正確色彩 token（或 CSS class）；`"INFO"` / `"WARNING"` / 未知等級亦覆蓋。
 2. `is_last_super_admin(users, target)` — target 為唯一 `super_admin` 時回 `True`；有兩位以上 `super_admin` 回 `False`；target 非 super_admin 回 `False`。
 3. `format_db_size(bytes)` — 正確格式化為 MB 字串（含 `0 → "0.0 MB"`）。
 4. `can_write` 分支（於 `tests/unit/test_models.py`）：`grade="viewer"` → `False`；`super_admin` / `editor` → `True`。
 
-### 頁面行為（`tests/app/test_admin.py`，AppTest）
+### 頁面行為（`tests/app/test_system_management.py`，AppTest）
 
 5. `viewer` 進入 → 頁面含「系統管理」標題、四分頁**皆可讀**，**不**含「僅限 Admin」錯誤，且寫入按鈕 `disabled`。
 6. `editor` / `super_admin` + mock → 寫入按鈕**未**停用（可寫）。
@@ -249,7 +249,7 @@ metric_cards([
 8. `GET /admin/users` 失敗（api 模式）→ 含 `st.error` + 「錯誤代碼」。
 9. 篩選後無資料 → 含 `st.info` 空狀態。
 
-> 依 CLAUDE.md，逐一先寫失敗測試 → 最小實作 → 綠燈重構。存取軸為 grade（非 role）；先做 `lib/models.py::can_write` 與 `lib/admin.py` 純函式（unit 1–4），再做頁面（AppTest 5–9）。
+> 依 CLAUDE.md，逐一先寫失敗測試 → 最小實作 → 綠燈重構。存取軸為 grade（非 role）；先做 `lib/models.py::can_write` 與 `lib/system_management.py` 純函式（unit 1–4），再做頁面（AppTest 5–9）。
 
 ---
 

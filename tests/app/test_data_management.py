@@ -33,6 +33,14 @@ def test_viewer_all_buttons_disabled():
     assert all(disabled_flags)        # 全部停用
 
 
+def test_viewer_create_submit_disabled():
+    """Viewer：新增分頁的「送出」按鈕停用。"""
+    at = _open_data_management(Actor("viewer", "admin", grade="viewer"))
+    submit = next((b for b in at.button if b.label == "送出"), None)
+    assert submit is not None
+    assert submit.disabled
+
+
 def test_admin_all_buttons_enabled():
     at = _open_data_management(Actor("admin", "admin"))
     edit_buttons = [b for b in at.button if b.label == "編輯"]

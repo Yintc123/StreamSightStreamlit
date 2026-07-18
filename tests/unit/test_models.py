@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from lib.models import Actor, Record, can_edit
+from lib.models import Actor, Record, can_edit, can_write
 
 
 def _record(created_by: str = "alice") -> Record:
@@ -63,3 +63,27 @@ def test_can_edit_viewer_admin_false():
 def test_can_edit_viewer_admin_own_record_also_false():
     """Viewer admin 即使是自己建立的資料也不可編輯（唯讀限制）。"""
     assert can_edit(_record(created_by="viewer"), Actor("viewer", "admin", grade="viewer")) is False
+
+
+# --- can_write(actor)：寫入權限單一真相 ---
+
+def test_can_write_super_admin_true():
+    assert can_write(Actor("admin", "admin", grade="super_admin")) is True
+
+
+def test_can_write_editor_true():
+    assert can_write(Actor("editor", "admin", grade="editor")) is True
+
+
+def test_can_write_viewer_false():
+    assert can_write(Actor("viewer", "admin", grade="viewer")) is False
+
+
+def test_can_write_user_role_false():
+    """role='user' → False（latent 防線）。"""
+    assert can_write(Actor("alice", "user")) is False
+
+
+def test_can_write_none_grade_admin_true():
+    """grade=None + admin → None != 'viewer' → 可寫（寬鬆預設）。"""
+    assert can_write(Actor("admin", "admin", grade=None)) is True

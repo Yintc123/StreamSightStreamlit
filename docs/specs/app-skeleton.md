@@ -180,7 +180,7 @@ def build_pages(role: str) -> list:
         st.Page("pages/analytics.py",        title="資料分析", default=True),
     ]
     if role == "admin":                        # 本部署所有登入者皆 admin → 恆註冊
-        pages.append(st.Page("pages/admin.py", title="系統管理"))
+        pages.append(st.Page("pages/system_management.py", title="系統管理"))
     return pages
 ```
 
@@ -257,7 +257,7 @@ pages/                      # 檔名對齊 CLAUDE.md(無編號);順序由 build_
 ├── data_management.py      # 資料管理
 ├── realtime_monitor.py     # 即時監控
 ├── analytics.py            # 資料分析(預設落地頁 default=True)
-└── admin.py                # 系統管理(admin-only 系統,皆註冊;寫入限 grade≠viewer)
+└── system_management.py    # 系統管理(admin-only 系統,皆註冊;寫入限 grade≠viewer)
 lib/                        # 見 §6
 styles/main.css             # 共用 CSS
 .streamlit/
@@ -321,6 +321,6 @@ streamlit run app.py        # 全 mock 下即可跑
 ## 11. 未決 / 待確認
 
 - `AUTH_MODE` / `DATA_SOURCE` 的旗標名稱與 dev 設定放置位置(`secrets.toml` vs `.env`)——本規格採 `secrets.toml`,如需 `.env` 再調。
-- ~~頁面檔名前綴是否統一~~ **已定**:採 CLAUDE.md 無編號慣例(`data_management.py`/`realtime_monitor.py`/`analytics.py`/`admin.py`),順序由 `build_pages` 顯式決定,不靠檔名。`gate.py` 已刪除,未登入邏輯收進 `app.py`;`dashboard.py` 已移除。
+- ~~頁面檔名前綴是否統一~~ **已定**:採 CLAUDE.md 無編號慣例(`data_management.py`/`realtime_monitor.py`/`analytics.py`/`system_management.py`),順序由 `build_pages` 顯式決定,不靠檔名。`gate.py` 已刪除,未登入邏輯收進 `app.py`;`dashboard.py` 已移除。
 - placeholder 業務頁的最小內容(`st.info("建置中")`)是否需要各自最小規格——骨架階段先不立。
 - `lib/realtime_client.py`(模組 3 即時監控的 WebSocket 消費層)詳規**待立**:連 FastAPI `/ws/live`、滑動視窗、斷線重連狀態機(重連上限對齊 [error-handling §8](error-handling.md#8-相依--待確認))、以可連 WS 的前端元件或 `fragment(run_every)` 呈現(取捨見 [功能能力對照](feature-capability.md))。§6 已登錄佔位,非骨架必要。

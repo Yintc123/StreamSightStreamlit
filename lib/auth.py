@@ -19,8 +19,8 @@ from lib.api_client import ApiClient
 from lib.config import get_settings
 from lib.models import Actor, NotAuthenticated
 
-# mock 種子預設身分(auth §3;供開發切換器覆寫)
-_DEFAULT_MOCK_ACTOR = Actor("alice", "user")
+# mock 種子預設身分(auth §3;供開發切換器覆寫)；系統為 admin-only，預設 editor grade
+_DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade="editor")
 
 
 def resolve_actor() -> Optional[Actor]:
@@ -29,7 +29,7 @@ def resolve_actor() -> Optional[Actor]:
     if settings.auth_mode == "mock":
         actor = state.get_actor()
         if actor is None:
-            actor = Actor(_DEFAULT_MOCK_ACTOR.username, _DEFAULT_MOCK_ACTOR.role)
+            actor = Actor(_DEFAULT_MOCK_ACTOR.username, _DEFAULT_MOCK_ACTOR.role, grade=_DEFAULT_MOCK_ACTOR.grade)
             state.set_actor(actor)
         return actor
 
@@ -41,7 +41,7 @@ def resolve_actor() -> Optional[Actor]:
     except NotAuthenticated:
         state.clear_auth()  # 進站辨識:未登入為正常狀態,清狀態回 None 導向 gate
         return None
-    actor = Actor(data["user"]["name"], map_role(data["role"]))
+    actor = Actor(data["user"]["name"], map_role(data["role"]), grade=data.get("grade"))
     state.set_actor(actor)
     state.set_token(data["accessToken"], data["expiresAt"])
     state.set_csrf(data["csrfToken"])

@@ -104,7 +104,7 @@ pages/
 ├── data_management.py     # 1. 資料管理
 ├── realtime_monitor.py    # 2. 即時監控（連 FastAPI WebSocket）
 ├── analytics.py           # 3. 資料分析（預設落地頁 default=True）
-└── admin.py               # 4. 系統管理（admin-only 系統，皆註冊；寫入限 grade≠viewer）
+└── system_management.py   # 4. 系統管理（admin-only 系統，皆註冊；寫入限 grade≠viewer）
 lib/
 ├── api_client.py          # FastAPI REST 呼叫封裝（帶 JWT、逾時 / 錯誤處理）
 ├── auth.py                # 認證 / 角色 helper（呼叫後端取 JWT，不碰 DB）

@@ -25,7 +25,7 @@ def test_admin_can_open_admin_page():
     at = AppTest.from_file(APP_PATH)
     at.session_state["actor"] = Actor("admin", "admin")
     at.run()
-    at.switch_page("pages/admin.py")
+    at.switch_page("pages/system_management.py")
     at.run()
     assert not at.exception
     assert "系統管理" in [t.value for t in at.title]

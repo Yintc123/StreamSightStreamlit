@@ -10,12 +10,13 @@ import streamlit as st
 from lib import state
 from lib.data_source import get_data_source
 from lib.import_utils import parse_csv_bytes, parse_json_bytes
-from lib.models import CATEGORIES, DEFAULT_SORT, RecordNotFound, ValidationError, can_edit
+from lib.models import CATEGORIES, DEFAULT_SORT, RecordNotFound, ValidationError, can_edit, can_write
 from lib.ui import empty_state, pagination_controls
 
 # ── module-level：dialog 函式必須在最頂層定義 ────────────────────
 ds = get_data_source()
 actor = state.get_actor()
+writable = actor is not None and can_write(actor)
 
 
 @st.dialog("編輯資料")
@@ -176,7 +177,7 @@ with create_tab:
         value    = st.number_input("數值", format="%.2f")
         category = st.selectbox("分類", CATEGORIES)
         note     = st.text_area("備註")
-        submitted = st.form_submit_button("送出")
+        submitted = st.form_submit_button("送出", disabled=not writable)
 
     if submitted:
         if not title.strip():
@@ -222,7 +223,7 @@ with import_tab:
                 if len(rows) > 10:
                     st.caption(f"（僅顯示前 10 列）")
 
-                if st.button("確認匯入", type="primary", key="dm_import_confirm"):
+                if st.button("確認匯入", type="primary", key="dm_import_confirm", disabled=not writable):
                     result = ds.bulk_create(rows, actor)
                     if result.errors:
                         st.warning(

@@ -29,7 +29,7 @@ def build_pages(role: str) -> List:
         st.Page("pages/analytics.py", title="資料分析", default=True),
     ]
     if role == "admin":
-        pages.append(st.Page("pages/admin.py", title="系統管理"))
+        pages.append(st.Page("pages/system_management.py", title="系統管理"))
     return pages
 
 

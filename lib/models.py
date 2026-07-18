@@ -71,6 +71,16 @@ class ImportResult:
     errors: list  # List[RowError]
 
 
+def can_write(actor: Actor) -> bool:
+    """寫入權限單一真相（供多頁按鈕 disabled gate 共用）。
+
+    super_admin / editor → True；viewer → False；role='user' → False（latent 防線）。
+    """
+    if actor.role != "admin":
+        return False
+    return actor.grade != "viewer"
+
+
 def can_edit(record: Record, actor: Actor) -> bool:
     """編輯權限判斷（供 mock 來源與頁面按鈕共用，單一真相）。
 
