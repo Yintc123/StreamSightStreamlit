@@ -41,6 +41,7 @@ lib/
 ## 相關文件
 
 - [技術架構](../architecture.md)(方案 B:Streamlit + FastAPI)
+- [應用骨架 / 基礎架構(Walking Skeleton)](app-skeleton.md)
 - [設計系統 / 樣式規格](design-system.md)
 - [功能能力對照](feature-capability.md)
 - [資料來源抽象層(Mock 先行,之後換 API)](data-source.md)

@@ -128,7 +128,6 @@ app.py                     # set_page_config + load_css()
 
 ## 相關文件
 
+- [應用骨架 / 基礎架構](app-skeleton.md)
 - [前端頁面結構](frontend-pages.md)
 - [技術架構](../architecture.md)
-</content>
-</invoke>
