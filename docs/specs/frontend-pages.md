@@ -9,7 +9,7 @@ Streamlit 前端切分為 4 個頁面,以 `st.navigation` + `st.Page` 組成,並
 | 1 | 資料管理 | 模組 2 | 已登入；寫入限 `grade != viewer` | 列表 / 新增 / 匯入 | [規格](pages/03-data-management.md) |
 | 2 | 即時監控 | 模組 3 | 已登入 | —（單頁：即時圖表＋告警） | [規格](pages/04-realtime-monitor.md) |
 | 3 | 資料分析 / 首頁 | 模組 4 | 已登入 | 統計 / 趨勢 / 匯出 | [規格](pages/05-analytics.md) |
-| 4 | 系統管理 | 模組 5 | 已登入皆可讀；寫入限 `grade != viewer` | 使用者 / 權限 / 日誌 / DB 狀態 | [規格](pages/06-admin.md) |
+| 4 | 系統管理 | 模組 5 | 已登入皆可讀（純讀取，無寫入操作） | 日誌 / DB 狀態 | [規格](pages/06-admin.md) |
 
 > **未登入導向**:由 `app.py` 直接處理(非頁面)。詳見 [Auth Gate 導向規格](pages/01-login.md)。
 > **預設落地頁**:資料分析(`default=True`)。原「儀表板 / 首頁」已移除,登入後首先落在資料分析。

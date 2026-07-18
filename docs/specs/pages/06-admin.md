@@ -169,8 +169,9 @@ metric_cards([
 4. `viewer` 進入 → 頁面正常渲染（無 exception）。
 5. DB 狀態分頁含 `metric_cards`（連線狀態、各表列數、DB 大小）。
 6. 日誌分頁渲染種子日誌（無 exception）。
+7. 日誌分頁日期篩選型別安全：注入 `admin_log_date_range=(date(2025,1,1), date(2025,12,31))` → 無 exception；種子日誌時間均在 2024 年，故 2025 年範圍無符合記錄 → `empty_state`（「無符合條件的日誌」）。（回歸：`date` 物件與字串混合 `<=` 比較已修正為 `str(date)` 做字典序比對。）
 
-> 依 CLAUDE.md，逐一先寫失敗測試 → 最小實作 → 綠燈重構。先做 `lib/system_management.py` 純函式（unit 1–2），再做頁面（AppTest 3–6）。
+> 依 CLAUDE.md，逐一先寫失敗測試 → 最小實作 → 綠燈重構。先做 `lib/system_management.py` 純函式（unit 1–2），再做頁面（AppTest 3–7）。
 
 ---
 

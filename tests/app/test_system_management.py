@@ -58,3 +58,18 @@ def test_logs_tab_renders_log_entries():
     """日誌分頁渲染種子日誌（無 exception）。"""
     at = _open_system_management(Actor("alice", "admin", grade="super_admin"))
     assert not at.exception
+
+
+# --- 8. 日期篩選不拋 TypeError ---
+
+def test_log_date_filter_works_without_type_error():
+    """日誌日期篩選以字串比對執行，不拋 TypeError；
+    2025 年無種子日誌 → 空狀態（「無符合條件的日誌」）。
+    """
+    from datetime import date
+
+    at = _open_system_management(Actor("alice", "admin", grade="super_admin"))
+    at.session_state["admin_log_date_range"] = (date(2025, 1, 1), date(2025, 12, 31))
+    at.run()
+    assert not at.exception
+    assert any("無符合條件的日誌" in i.value for i in at.info)

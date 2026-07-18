@@ -33,7 +33,7 @@ with logs_tab:
     if fp_log.date_from and fp_log.date_to:
         filtered_logs = [
             lg for lg in filtered_logs
-            if fp_log.date_from <= lg["time"][:10] <= str(fp_log.date_to)
+            if str(fp_log.date_from) <= lg["time"][:10] <= str(fp_log.date_to)
         ]
 
     log_total = len(filtered_logs)
