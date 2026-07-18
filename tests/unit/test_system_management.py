@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import pytest
-
 from lib.system_management import (
     color_log_level,
     format_db_size,
-    is_last_super_admin,
     seed_db_status,
     seed_logs,
-    seed_users,
 )
 
 
@@ -32,32 +28,6 @@ def test_color_log_level_unknown_returns_neutral():
     assert result not in ("#FF4B4B", "#FFA500", "#21C354")
 
 
-# --- is_last_super_admin ---
-
-def _users(grades: list) -> list:
-    return [{"username": f"u{i}", "grade": g} for i, g in enumerate(grades)]
-
-
-def test_is_last_super_admin_true_when_only_one():
-    users = _users(["super_admin", "editor", "viewer"])
-    assert is_last_super_admin(users, "u0") is True
-
-
-def test_is_last_super_admin_false_when_two_super_admins():
-    users = _users(["super_admin", "super_admin", "viewer"])
-    assert is_last_super_admin(users, "u0") is False
-
-
-def test_is_last_super_admin_false_when_target_not_super_admin():
-    users = _users(["super_admin", "editor"])
-    assert is_last_super_admin(users, "u1") is False
-
-
-def test_is_last_super_admin_false_when_target_absent():
-    users = _users(["super_admin"])
-    assert is_last_super_admin(users, "nobody") is False
-
-
 # --- format_db_size ---
 
 def test_format_db_size_zero():
@@ -73,24 +43,6 @@ def test_format_db_size_fifty_mb():
 
 
 # --- seed functions deterministic ---
-
-def test_seed_users_returns_list_with_required_keys():
-    users = seed_users()
-    assert isinstance(users, list)
-    assert len(users) >= 1
-    for u in users:
-        assert "username" in u
-        assert "email" in u
-        assert "grade" in u
-        assert "status" in u
-
-
-def test_seed_users_includes_all_grades():
-    grades = {u["grade"] for u in seed_users()}
-    assert "super_admin" in grades
-    assert "editor" in grades
-    assert "viewer" in grades
-
 
 def test_seed_logs_returns_list_with_required_keys():
     logs = seed_logs()
@@ -122,6 +74,5 @@ def test_seed_db_status_returns_dict_with_required_keys():
 
 
 def test_seed_functions_are_deterministic():
-    assert seed_users() == seed_users()
     assert seed_logs() == seed_logs()
     assert seed_db_status() == seed_db_status()

@@ -17,26 +17,9 @@ def color_log_level(level: str) -> str:
     }.get(level, "#808495")
 
 
-def is_last_super_admin(users: List[dict], target_username: str) -> bool:
-    """target 為唯一 super_admin 時回 True（擋降級 / 停用保護）。"""
-    super_admins = [u for u in users if u.get("grade") == "super_admin"]
-    if len(super_admins) != 1:
-        return False
-    return super_admins[0]["username"] == target_username
-
-
 def format_db_size(size_bytes: int) -> str:
     """位元組 → '{:.1f} MB' 字串；0 → '0.0 MB'。"""
     return f"{size_bytes / (1024 * 1024):.1f} MB"
-
-
-def seed_users() -> List[dict]:
-    """mock 靜態使用者清單（決定性，不依賴時鐘）。"""
-    return [
-        {"username": "alice",  "email": "alice@example.com",  "grade": "super_admin", "created_at": "2024-01-01", "status": "active"},
-        {"username": "bob",    "email": "bob@example.com",    "grade": "editor",      "created_at": "2024-01-02", "status": "active"},
-        {"username": "carol",  "email": "carol@example.com",  "grade": "viewer",      "created_at": "2024-01-03", "status": "active"},
-    ]
 
 
 def seed_logs() -> List[dict]:
