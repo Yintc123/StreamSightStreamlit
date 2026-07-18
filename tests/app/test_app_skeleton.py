@@ -20,10 +20,10 @@ def test_app_runs_and_defaults_to_analytics():
     assert "儀表板" not in titles
 
 
-def test_admin_can_open_admin_page():
-    """Admin 有註冊系統管理頁,可導入並看到其內容。"""
+def test_super_admin_can_open_admin_page():
+    """super_admin のみ系統管理頁が登録され、内容を閲覧できる。"""
     at = AppTest.from_file(APP_PATH)
-    at.session_state["actor"] = Actor("admin", "admin")
+    at.session_state["actor"] = Actor("admin", "admin", grade="super_admin")
     at.run()
     at.switch_page("pages/system_management.py")
     at.run()

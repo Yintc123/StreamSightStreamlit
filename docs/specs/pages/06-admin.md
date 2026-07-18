@@ -2,8 +2,8 @@
 
 - 頁面編號:6
 - 對應模組:模組 5 系統管理
-- 存取權限:**所有登入者可讀**（本系統為 admin-only,三種 grade `super_admin` / `editor` / `viewer` 皆可進本頁）；本頁為純讀取，無寫入操作。存取軸的權威定義見[前端頁面結構 §存取控制](../frontend-pages.md#存取控制本節為存取軸的單一真相)。
-- 導覽:因所有登入者皆為 admin role,`build_pages` 對每個人都註冊此頁——見[應用骨架 §5](../app-skeleton.md#5-導覽與頁面註冊build_pages)
+- 存取權限:**僅 `grade == "super_admin"`**（`editor` / `viewer` 不可見；由 `build_pages(actor)` 動態不註冊，比隱藏連結更安全）。存取軸的權威定義見[前端頁面結構 §存取控制](../frontend-pages.md#存取控制本節為存取軸的單一真相)。
+- 導覽:`build_pages(actor)` 僅在 `actor.grade == "super_admin"` 時追加此頁——見[應用骨架 §5](../app-skeleton.md#5-導覽與頁面註冊build_pages)
 - 相關:[UI Helper 規格](../ui.md)、[錯誤處理規格](../error-handling.md)
 
 ## 目的

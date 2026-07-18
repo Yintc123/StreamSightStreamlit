@@ -19,11 +19,11 @@ def _open_system_management(actor: Actor) -> AppTest:
     return at
 
 
-# --- 5. 所有 grade 可讀（標題 + 兩分頁） ---
+# --- 5. 僅 super_admin 可見（標題 + 兩分頁） ---
 
 def test_page_has_title_and_two_tabs():
-    """任意 grade 進入 → 頁面含「系統管理」標題且含兩個分頁。"""
-    at = _open_system_management(Actor("alice", "admin", grade="editor"))
+    """super_admin 進入 → 頁面含「系統管理」標題且含兩個分頁。"""
+    at = _open_system_management(Actor("admin", "admin", grade="super_admin"))
     assert not at.exception
     assert any("系統管理" in t.value for t in at.title)
     tab_labels = [t.label for t in at.tabs]
@@ -33,11 +33,11 @@ def test_page_has_title_and_two_tabs():
     assert "權限" not in tab_labels
 
 
-def test_viewer_can_read_page():
-    """viewer 可進入且頁面正常渲染（無 exception）。"""
+def test_viewer_cannot_see_system_management():
+    """viewer は build_pages に系統管理が含まれないため直接ナビゲートしても表示されない。"""
     at = _open_system_management(Actor("viewer", "admin", grade="viewer"))
     assert not at.exception
-    assert any("系統管理" in t.value for t in at.title)
+    assert not any("系統管理" in t.value for t in at.title)
 
 
 # --- 6. DB 狀態分頁含 metric 指標 ---

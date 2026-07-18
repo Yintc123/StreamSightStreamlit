@@ -31,5 +31,5 @@ if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.j
 if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
-pages = build_pages(actor.role)  # ⑥ 依 role 動態組頁清單
+pages = build_pages(actor)  # ⑥ 依 actor.grade 動態組頁清單
 st.navigation(pages).run()  # ⑦ 交給 Streamlit 路由
