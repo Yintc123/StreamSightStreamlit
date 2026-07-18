@@ -40,6 +40,7 @@ class BaseAppSettings(BaseSettings):
     bff_session_path: str = "/api/auth/session"  # introspection 端點
     bff_logout_path: str = "/api/auth/logout"
     bff_csrf_path: str = "/api/csrf"  # CSRF token 端點(auth-flow §7.3)
+    bff_login_path: str = "/login"  # Next.js 登入頁路徑(actor is None 時跳轉)
     role_admin_value: int = 1  # role 數值 → admin,其餘 user;待與前端 Role enum 對齊
 
     # HTTP client(§3.5;時間單位一律「秒」)

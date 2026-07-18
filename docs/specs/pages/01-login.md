@@ -1,83 +1,54 @@
-# 頁面規格:未登入導向頁(Auth Gate)
+# Auth Gate 導向規格(未登入跳轉)
 
-- 頁面編號:1
 - 對應模組:模組 1 認證
-- 存取權限:未登入使用者
-- 導覽:未登入時為唯一註冊的頁面
+- 實作位置:`app.py`(非獨立頁面檔)
+- 存取觸發:未登入使用者(僅 `AUTH_MODE=bff`)
 - 關聯:[ADR 0003](../../decisions/0003-auth-via-bff-token-exchange.md)、[認證流程規格](../auth-flow.md)
 
-> **本頁已改版**(見 [ADR 0003](../../decisions/0003-auth-via-bff-token-exchange.md)):採 Design B「BFF session 換短命 JWT」後,**Streamlit 不再自建登入 / 註冊表單**。因為 Streamlit 無法 `Set-Cookie`(無 response 物件),登入 / 註冊**一律委派主前端**;本頁退化為「**未登入時的導向 / 載入頁**」,唯一職責是把使用者送去主前端登入頁。
+> **本規格已從「登入頁」改版為「Auth Gate 導向」**:採 Design B 後 Streamlit 無法 `Set-Cookie`,登入一律委派 Next.js 主前端。`pages/gate.py` 已刪除；未登入邏輯集中在 `app.py` 並以 `<meta http-equiv="refresh">` 跳轉。
 
 ## 目的
 
-在使用者**未持有有效 session** 時顯示,並將其**導向主前端登入頁**;登入成功後由主前端種下共享 cookie 並導回 Streamlit。本頁**不收帳密、不呼叫登入 API、不建立 session**。
+使用者**未持有有效 session** 時,`app.py` 立即把瀏覽器整頁導向 Next.js 登入頁;登入成功後由主前端種下共享 cookie 並導回 Streamlit。Streamlit 端**不收帳密、不呼叫登入 API、不建立 session**。
 
 ## 觸發時機
 
-由 `app.py` 的 auth gate 決定(見 [auth-flow.md §4](../auth-flow.md)):
+`app.py` 每次 rerun 執行如下:
 
-1. 讀 `st.context.cookies` 取加密 cookie。
-2. 轉發 BFF `GET /api/auth/session`。
-   - **200** → 寫入身分 / role,依角色動態註冊業務頁,導向儀表板;**不顯示本頁**。
-   - **401 / 無 cookie** → 只註冊本頁並顯示,啟動導向。
+1. 呼叫 `resolve_actor()`。
+2. **`actor is None`**(無 cookie 或 introspection 401)→ 以下邏輯跳轉並 `st.stop()`。
+   - `mock` 模式 `resolve_actor()` 恆回 `Actor`,**不會觸發此分支**。
 
-## 版面
+## 實作(`app.py` 核心邏輯)
 
-窄欄置中、極簡載入卡片(未登入者唯一頁面,聚焦「正在前往登入」)。以 `st.columns([1, 1.4, 1])` 置中。
-
-```
-                 ┌──────────── 置中欄 ────────────┐
-                 │           StreamSight          │  ← st.title / logo
-                 │        資料監控與分析平台        │  ← st.caption
-                 │  ┌──────────────────────────┐  │
-                 │  │      ⟳ 正在前往登入…       │  │  ← st.spinner / 文字
-                 │  │                          │  │
-                 │  │   若未自動跳轉,請點此:    │  │
-                 │  │        [ 前往登入 ]        │  │  ← 手動 fallback 連結
-                 │  └──────────────────────────┘  │
-                 └────────────────────────────────┘
+```python
+if actor is None:   # 僅 AUTH_MODE=bff 會發生
+    _s = get_settings()
+    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    st.markdown(
+        f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+        unsafe_allow_html=True,
+    )
+    st.stop()
 ```
 
-| 區域 | 元件 | 備註 |
-|---|---|---|
-| 置中容器 | `st.columns([1, 1.4, 1])` | 只用中欄,左右留白 |
-| 標題 | `st.title` / logo + `st.caption` | 品牌一致 |
-| 導向提示 | 文字 + `st.spinner` | 「正在前往登入…」 |
-| 自動導向 | `st.components.v1.html`(注入 `window.top.location.href = <登入 URL>`) | 進頁即觸發 |
-| 手動 fallback | `st.link_button("前往登入", <登入 URL>)` | 自動導向被 CSP / iframe 擋住時的後備 |
+- **跳轉目標**:`BFF_BASE_URL + BFF_LOGIN_PATH`(預設 `http://localhost:3000/login`)。
+- **設定**:`BFF_LOGIN_PATH`(預設 `/login`,可覆寫)→ 見 [config §3.3](../config.md)。
+- **備援**:瀏覽器若不支援 meta refresh,無法自動跳轉;可視需求加 `st.link_button` 手動後備。
 
-## 功能細節
+## 登入成功後
 
-### 導向登入
-- 目標 URL:主前端登入頁 + **回跳參數**,例:
-  `https://app.example.com/login?next=https://dash.example.com/<原路徑>`
-- 導向方式:注入 JS `window.top.location.href = ...`(需導**整個頁面**,非 iframe 內層);同時提供 `st.link_button` 手動後備。
-- `next` 由 Streamlit 產生**自身**的回跳網址;**主前端端**必須對 `next` 做**白名單驗證**(僅允許 Streamlit 網域),避免 open-redirect。
+主前端種下共享 cookie(`Domain=.<父網域>`)後導回 Streamlit。Streamlit 重跑 → `resolve_actor()` 讀到 cookie → introspection 200 → 進入業務頁。
 
-### 導向註冊
-- 同理提供「註冊」連結,導向主前端註冊頁(`https://app.example.com/register?next=...`)。
-- Streamlit **不提供**註冊表單、不呼叫 `/auth/register`。
+## 設定項
 
-### 登入成功後
-- 主前端種下共享 cookie(`Domain=.<父網域>`)後,依 `next` 導回 Streamlit。
-- Streamlit 重跑 → auth gate 讀到 cookie → introspection 200 → 進入儀表板(**不再顯示本頁**)。
-
-## 狀態與錯誤處理
-
-呈現依 [錯誤處理規格 §3](../error-handling.md#3-呈現契約本規格唯一權威);本頁為 §3 ※「auth gate 導向頁」的**唯一層級例外**(逾時用 `info` 而非 `error`):
-
-- **已登入者**進入本頁(理論上不會發生,gate 已擋)→ 直接導向儀表板。
-- **introspection 逾時 / BFF 不可用**:以 `st.info` 顯示「暫時無法連線,請稍後重試」+ 手動「前往登入」後備;不進入業務頁。
-- **導向被瀏覽器擋下**(CSP / 第三方情境):依賴手動 `st.link_button` 後備。
-
-## 資料
-
-- 本頁**不存取任何 users 資料**、不碰 DB、不呼叫認證憑證端點。
-- 身分 / 角色由 auth gate 經 BFF introspection 取得(見 [auth-flow.md](../auth-flow.md)),非本頁職責。
+| 設定 | env 變數 | 預設 | 說明 |
+|---|---|---|---|
+| BFF base URL | `BFF_BASE_URL` | `http://localhost:3000` | Next.js 主前端 |
+| 登入路徑 | `BFF_LOGIN_PATH` | `/login` | Next.js 登入頁路徑 |
 
 ## 依賴 / 備註
 
 - 認證流程與端點契約見 [auth-flow.md](../auth-flow.md);決策背景見 [ADR 0003](../../decisions/0003-auth-via-bff-token-exchange.md)。
-- 需設定:主前端**登入頁 URL**、**註冊頁 URL**(放 `lib/config.py`)。
-- 登入 / 註冊 / 密碼雜湊(Argon2)全由**主前端 BFF + 後端**負責;Streamlit 端無憑證處理邏輯。
-- **硬前提**:主前端與 Streamlit 同父網域(否則 cookie 不共享,見 [auth-flow.md §2](../auth-flow.md))。
+- **硬前提**:主前端與 Streamlit 同父網域(否則 cookie 不共享)。
+- 登入 / 註冊 / 密碼雜湊(Argon2)全由主前端 BFF + 後端負責;Streamlit 端無憑證處理邏輯。

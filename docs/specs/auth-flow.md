@@ -198,17 +198,17 @@ sequenceDiagram
 
 ### 4.4 登入(委派主前端,Streamlit 不自建登入表單)
 
-> ⚠️ **與現有 [01-login.md](pages/01-login.md) 衝突,需修訂**:在共享 cookie 模型下,登入必須產生**加密 cookie**,而 **Streamlit 沒有 response 物件、寫不了 cookie**(前端 `001b`/`001c` 的 `Set-Cookie` 只能發生在能寫 response 的 Next.js Route Handler)。因此 **Streamlit 不能自己擁有登入表單**,登入一律委派主前端。
+Streamlit 無法 `Set-Cookie`(無 response 物件),登入一律委派 Next.js 主前端。詳見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)。
 
 流程:
-1. Streamlit 偵測未登入(無 cookie 或 introspection 401)。
-2. 以一小段前端導向,把瀏覽器**整頁**導到主前端登入頁,並帶回跳網址:
-   `https://app.example.com/login?next=https://dash.example.com/...`
-   - Streamlit 導外部 URL 需注入 JS(`st.components.v1.html` 內 `window.top.location.href = ...`)或 meta refresh;封裝成 `lib/` 的 helper。
-3. 使用者在主前端登入成功 → BFF 種下共享 cookie → 依 `next` 導回 Streamlit。
-4. Streamlit 重跑 → cookie 已在 → introspection 200 → 進入。
+1. Streamlit 偵測未登入(`resolve_actor()` 回 `None`:無 cookie 或 introspection 401)。
+2. `app.py` 以 `<meta http-equiv="refresh">` 把瀏覽器整頁導到 Next.js 登入頁:
+   - 目標:`BFF_BASE_URL + BFF_LOGIN_PATH`(預設 `http://localhost:3000/login`)。
+   - **無獨立 `gate.py` 頁面**;邏輯直接在 `app.py` 的 `actor is None` 分支。
+3. 使用者在主前端登入成功 → BFF 種下共享 cookie。
+4. Streamlit 重跑 → cookie 已在 → introspection 200 → 進入業務頁。
 
-> **後果**:原 `01-login.md`「Streamlit 以 `st.tabs` 提供登入/註冊表單」需改為「未登入時顯示極簡的**導向/載入頁**」。註冊亦導向主前端註冊頁。
+> 導向細節與設定項見 [Auth Gate 導向規格](pages/01-login.md)。
 
 ### 4.5 登出
 
@@ -314,4 +314,4 @@ sequenceDiagram
 - [ ] `spike-1`(§8)結果:`st.context.cookies` 能否讀 httpOnly cookie。
 - [ ] token `expiresAt` 提前 refresh 門檻、introspection 快取 TTL 定值。
 
-> **決策已記錄於 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)**(採 Design B:BFF session 換短命 JWT;含「Streamlit 為何無法 Set-Cookie」的詳解與 Design A/C 否決理由)。後續待辦:同步修訂 [01-login.md](pages/01-login.md)(Streamlit 登入頁改為導向頁),並微調 [ADR 0002] 認證細節為「登入委派主前端 BFF、Streamlit 經 introspection 取 token」。
+> **決策已記錄於 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)**(採 Design B:BFF session 換短命 JWT;含「Streamlit 為何無法 Set-Cookie」的詳解與 Design A/C 否決理由)。[01-login.md](pages/01-login.md) 已更新為「Auth Gate 導向規格」(`gate.py` 已刪,邏輯收進 `app.py` meta refresh)。[ADR 0002] 認證細節已對齊「登入委派主前端 BFF、Streamlit 經 introspection 取 token」。

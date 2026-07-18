@@ -19,8 +19,13 @@ load_css()  # ② 載入一次 CSS
 
 actor = resolve_actor()  # ③ 身分解析(mock/bff 單一出口)
 
-if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 只註冊導向頁
-    st.navigation([st.Page("pages/gate.py", title="登入")]).run()
+if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.js 登入頁
+    _s = get_settings()
+    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    st.markdown(
+        f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+        unsafe_allow_html=True,
+    )
     st.stop()
 
 if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)

@@ -143,3 +143,9 @@ def test_bff_auth_setting_defaults():
     assert s.bff_logout_path == "/api/auth/logout"
     assert s.bff_csrf_path == "/api/csrf"
     assert s.role_admin_value == 1
+
+
+def test_bff_login_path_default():
+    """bff_login_path 預設 /login，供 actor is None 時跳轉 Next.js 登入頁。"""
+    s = get_settings()
+    assert s.bff_login_path == "/login"

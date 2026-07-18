@@ -30,6 +30,19 @@ def test_admin_can_open_admin_page():
     assert "系統管理" in [t.value for t in at.title]
 
 
+def test_bff_no_actor_redirects_to_login(monkeypatch):
+    """bff 模式無 cookie → actor is None → meta refresh 跳轉 Next.js 登入，不顯示儀表板。"""
+    monkeypatch.setenv("AUTH_MODE", "bff")
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not at.exception
+    titles = [t.value for t in at.title]
+    assert "儀表板" not in titles
+    # meta refresh 含 /login 路徑
+    markdowns = [m.value for m in at.markdown]
+    assert any("/login" in m for m in markdowns)
+
+
 def test_non_admin_cannot_open_admin_page():
     """一般使用者未註冊系統管理頁:嘗試導入被擋,停在預設儀表板(比隱藏更安全)。"""
     at = AppTest.from_file(APP_PATH)
