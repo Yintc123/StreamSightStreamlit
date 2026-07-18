@@ -29,3 +29,18 @@ def test_crud_persists_across_calls_via_session(fake_session):
     )
     # 下次取得的資料源仍看得到剛建立的資料(共用 session_state["mock_records"])
     assert get_data_source().list_records(size=100).total == 41
+
+
+def test_api_mode_returns_apidatasource(monkeypatch, fake_session):
+    from lib.api_client import ApiDataSource
+
+    monkeypatch.setenv("APP_ENV", "development")  # api / bff
+    assert isinstance(get_data_source(), ApiDataSource)
+
+
+def test_api_plus_mock_combo_raises_at_startup(monkeypatch):
+    # §9 測 9:無效組合由 config 守衛在 get_settings() 啟動時擋下
+    monkeypatch.setenv("DATA_SOURCE", "api")
+    monkeypatch.setenv("AUTH_MODE", "mock")
+    with pytest.raises(ValueError):
+        get_data_source()

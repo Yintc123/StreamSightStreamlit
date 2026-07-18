@@ -121,3 +121,15 @@ def test_test_env_is_hermetic_ignores_dotenv(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("APP_ENV", "test")
     assert get_settings().auth_mode == "mock"  # test 忽略 .env,套預設 mock
+
+
+# --- HTTP / cookie 設定項(config §3.3、§3.5) ---
+
+def test_http_and_cookie_setting_defaults():
+    s = get_settings()
+    assert s.session_cookie_name == "streamsight_session"
+    assert s.http_connect_timeout_seconds == 3
+    assert s.http_read_timeout_seconds == 10
+    assert s.http_retry_max == 2
+    assert s.http_retry_base_seconds == 0.2
+    assert s.http_retry_factor == 2

@@ -82,3 +82,7 @@ class PermissionDenied(Exception):
 
 class ValidationError(Exception):
     """建立 / 更新 / 查詢欄位不合法(對應後端 400 / 422)。"""
+
+
+class NotAuthenticated(Exception):
+    """reactive refresh 後仍 401,session 失效(對應 401)。見 auth §5。"""

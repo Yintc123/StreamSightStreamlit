@@ -37,10 +37,38 @@ class DataSource(Protocol):
 
 
 def get_data_source() -> DataSource:
-    """依 DATA_SOURCE 旗標回傳資料源實作。"""
+    """依 DATA_SOURCE 旗標回傳資料源實作。
+
+    無效組合(api+mock)已於 get_settings() 由 config 守衛啟動時擋下。
+    """
     settings = get_settings()
     if settings.data_source == "mock":
         if "mock_records" not in st.session_state:
             st.session_state["mock_records"] = make_seed_records()
         return MockDataSource(st.session_state["mock_records"])
-    raise NotImplementedError("DATA_SOURCE=api 需 ApiDataSource(接 API 階段)")
+    return _build_api_data_source(settings)
+
+
+def _build_api_data_source(settings) -> DataSource:
+    import httpx
+
+    from lib import auth
+    from lib.api_client import ApiClient, ApiDataSource
+
+    timeout = httpx.Timeout(
+        connect=settings.http_connect_timeout_seconds,
+        read=settings.http_read_timeout_seconds,
+        write=settings.http_read_timeout_seconds,
+        pool=settings.http_connect_timeout_seconds,
+    )
+    client = ApiClient(
+        client=httpx.Client(timeout=timeout),
+        get_token=auth.get_access_token,
+        refresh_token=auth.refresh_token,
+        raw_cookie=auth.raw_cookie,
+        cookie_name=settings.session_cookie_name,
+        retry_max=settings.http_retry_max,
+        retry_base=settings.http_retry_base_seconds,
+        retry_factor=settings.http_retry_factor,
+    )
+    return ApiDataSource(client, settings.fastapi_base_url)

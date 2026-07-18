@@ -36,6 +36,14 @@ class BaseAppSettings(BaseSettings):
     # BFF(introspection 目標)/ FastAPI(業務 API 目標)base URL(§3.3、§3.4)
     bff_base_url: str = "http://localhost:3000"
     fastapi_base_url: str = "http://localhost:3001"
+    session_cookie_name: str = "streamsight_session"  # 必與前端一致
+
+    # HTTP client(§3.5;時間單位一律「秒」)
+    http_connect_timeout_seconds: float = 3
+    http_read_timeout_seconds: float = 10
+    http_retry_max: int = 2  # 網路重試上限(僅 GET)
+    http_retry_base_seconds: float = 0.2
+    http_retry_factor: float = 2
 
     @model_validator(mode="after")
     def _check_prod_guards(self) -> "BaseAppSettings":

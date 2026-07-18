@@ -32,3 +32,13 @@ def test_resolve_actor_mock_returns_existing_actor(fake_session):
 def test_get_access_token_mock_raises_runtime_error(fake_session):
     with pytest.raises(RuntimeError):
         auth.get_access_token()
+
+
+def test_refresh_token_mock_raises_runtime_error(fake_session):
+    with pytest.raises(RuntimeError):
+        auth.refresh_token()
+
+
+def test_raw_cookie_mock_raises_runtime_error(fake_session):
+    with pytest.raises(RuntimeError):
+        auth.raw_cookie()

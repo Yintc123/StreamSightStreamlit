@@ -29,7 +29,20 @@ def resolve_actor() -> Optional[Actor]:
 
 def get_access_token() -> str:
     """供 api_client 帶 Bearer;mock 下無 token,誤呼即拋錯凸顯設定錯誤(auth §2)。"""
-    settings = get_settings()
-    if settings.auth_mode == "mock":
+    if get_settings().auth_mode == "mock":
         raise RuntimeError("AUTH_MODE=mock 無 token")
+    raise NotImplementedError("AUTH_MODE=bff 尚未實作(接 API 階段)")
+
+
+def refresh_token() -> str:
+    """重呼 introspection 換新 token;mock 下不應被呼叫(auth §2)。"""
+    if get_settings().auth_mode == "mock":
+        raise RuntimeError("AUTH_MODE=mock 無 token")
+    raise NotImplementedError("AUTH_MODE=bff 尚未實作(接 API 階段)")
+
+
+def raw_cookie() -> Optional[str]:
+    """從 st.context.cookies 取加密 session cookie 原值;mock 下不應被呼叫(auth §2)。"""
+    if get_settings().auth_mode == "mock":
+        raise RuntimeError("AUTH_MODE=mock 無 cookie")
     raise NotImplementedError("AUTH_MODE=bff 尚未實作(接 API 階段)")
