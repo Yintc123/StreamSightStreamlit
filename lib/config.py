@@ -37,6 +37,9 @@ class BaseAppSettings(BaseSettings):
     bff_base_url: str = "http://localhost:3000"
     fastapi_base_url: str = "http://localhost:3001"
     session_cookie_name: str = "streamsight_session"  # 必與前端一致
+    bff_session_path: str = "/api/auth/session"  # introspection 端點
+    bff_logout_path: str = "/api/auth/logout"
+    role_admin_value: int = 1  # role 數值 → admin,其餘 user;待與前端 Role enum 對齊
 
     # HTTP client(§3.5;時間單位一律「秒」)
     http_connect_timeout_seconds: float = 3

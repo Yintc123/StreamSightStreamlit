@@ -133,3 +133,12 @@ def test_http_and_cookie_setting_defaults():
     assert s.http_retry_max == 2
     assert s.http_retry_base_seconds == 0.2
     assert s.http_retry_factor == 2
+
+
+# --- BFF / 認證設定項(config §3.3、§3.7) ---
+
+def test_bff_auth_setting_defaults():
+    s = get_settings()
+    assert s.bff_session_path == "/api/auth/session"
+    assert s.bff_logout_path == "/api/auth/logout"
+    assert s.role_admin_value == 1
