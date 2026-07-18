@@ -98,6 +98,18 @@ def test_sort_by_value_descending():
     assert values == sorted(values, reverse=True)
 
 
+def test_sort_by_id_ascending():
+    items = MockDataSource().list_records(sort="id:asc", size=100).items
+    ids = [r.id for r in items]
+    assert ids == sorted(ids)
+
+
+def test_sort_by_id_descending():
+    items = MockDataSource().list_records(sort="id:desc", size=100).items
+    ids = [r.id for r in items]
+    assert ids == sorted(ids, reverse=True)
+
+
 def test_invalid_sort_field_raises_validation_error():
     with pytest.raises(ValidationError):
         MockDataSource().list_records(sort="bogus:asc", size=100)

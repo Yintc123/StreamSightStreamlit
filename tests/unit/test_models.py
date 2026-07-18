@@ -31,3 +31,35 @@ def test_can_edit_creator_true():
 
 def test_can_edit_other_user_false():
     assert can_edit(_record(created_by="alice"), Actor("bob", "user")) is False
+
+
+# --- grade 欄位與 admin_role 對齊後端 ---
+
+def test_actor_has_grade_field():
+    """Actor 有 grade 欄位，預設 None。"""
+    a = Actor("alice", "user")
+    assert hasattr(a, "grade")
+    assert a.grade is None
+
+
+def test_actor_grade_can_be_set():
+    a = Actor("admin", "admin", grade="super_admin")
+    assert a.grade == "super_admin"
+
+
+def test_can_edit_super_admin_true():
+    assert can_edit(_record(created_by="bob"), Actor("admin", "admin", grade="super_admin")) is True
+
+
+def test_can_edit_editor_admin_true():
+    assert can_edit(_record(created_by="bob"), Actor("editor", "admin", grade="editor")) is True
+
+
+def test_can_edit_viewer_admin_false():
+    """Viewer admin 唯讀，不可編輯任何資料。"""
+    assert can_edit(_record(created_by="bob"), Actor("viewer", "admin", grade="viewer")) is False
+
+
+def test_can_edit_viewer_admin_own_record_also_false():
+    """Viewer admin 即使是自己建立的資料也不可編輯（唯讀限制）。"""
+    assert can_edit(_record(created_by="viewer"), Actor("viewer", "admin", grade="viewer")) is False

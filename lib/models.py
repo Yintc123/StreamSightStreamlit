@@ -19,16 +19,23 @@ Category = Literal["感測器", "系統", "應用", "網路"]
 
 # selectbox 與種子共用;list 型別以相容 3.9 寫法
 CATEGORIES = ["感測器", "系統", "應用", "網路"]
-SORTABLE = ["title", "value", "category", "created_at"]
-DEFAULT_SORT = "created_at:desc"
+SORTABLE = ["id", "title", "value", "category", "created_at"]
+DEFAULT_SORT = "id:asc"
 
 
 @dataclass
 class Actor:
-    """目前操作者(mock 由開發切換器提供;日後由認證提供)。"""
+    """目前操作者(mock 由開發切換器提供;日後由認證提供)。
+
+    grade：對應後端 JWT grade claim。
+      - admin → "super_admin" | "editor" | "viewer"（見後端 AdminRole）
+      - user  → "free" | "premium"（見後端 UserTier）
+      - None  → 未知或不需判斷
+    """
 
     username: str
-    role: Role  # "user" | "admin"
+    role: Role          # "user" | "admin"
+    grade: Optional[str] = None  # admin_role 或 user_tier
 
 
 @dataclass
@@ -65,8 +72,15 @@ class ImportResult:
 
 
 def can_edit(record: Record, actor: Actor) -> bool:
-    """Admin 恆可編輯;否則僅創建者本人。供 mock 來源與頁面按鈕共用(單一真相)。"""
-    return actor.role == "admin" or record.created_by == actor.username
+    """編輯權限判斷（供 mock 來源與頁面按鈕共用，單一真相）。
+
+    - admin + grade="viewer" → 唯讀，不可編輯（任何記錄）
+    - admin（其他 grade） → 可編輯任何記錄
+    - user → 只可編輯自己建立的記錄
+    """
+    if actor.role == "admin":
+        return actor.grade != "viewer"
+    return record.created_by == actor.username
 
 
 # --- 域例外(data-source §例外;mock 與 api 同契約)---
