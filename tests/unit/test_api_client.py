@@ -115,6 +115,20 @@ def test_cookie_auth_forwards_cookie_without_bearer():
     assert "cookie-raw" in (captured["cookie"] or "")
 
 
+def test_extra_headers_are_sent_in_request():
+    """extra_headers 的 key-value 被送入實際 HTTP 請求 headers。"""
+    captured = {}
+
+    def handler(request):
+        captured["csrf"] = request.headers.get("X-CSRF-Token")
+        return httpx.Response(200, json={})
+
+    make_client(handler).request(
+        "POST", "http://test/logout", auth="cookie", extra_headers={"X-CSRF-Token": "tok-csrf"}
+    )
+    assert captured["csrf"] == "tok-csrf"
+
+
 def test_204_returns_none():
     c = make_client(lambda request: httpx.Response(204))
     assert c.request("DELETE", "http://test/records/1") is None

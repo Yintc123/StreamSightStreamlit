@@ -104,8 +104,11 @@ class ApiClient:
         auth: str = "bearer",
         json: Optional[Any] = None,
         params: Optional[dict] = None,
+        extra_headers: Optional[dict] = None,
     ) -> Any:
         headers: dict = {}
+        if extra_headers:
+            headers.update(extra_headers)
         if json is not None:
             headers["Content-Type"] = "application/json"
         if auth == "bearer":

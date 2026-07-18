@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import httpx
 import pytest
 import streamlit as st
 
 from lib import auth
+from lib.api_client import ApiError
 from lib.models import Actor, NotAuthenticated
 
 
@@ -122,3 +124,100 @@ def test_raw_cookie_bff_reads_context_cookie(bff_mode, fake_session, monkeypatch
 def test_get_access_token_bff_returns_stored_token(bff_mode, fake_session):
     fake_session["access_token"] = "jwt"
     assert auth.get_access_token() == "jwt"
+
+
+# --- logout mock 分支 ---
+
+def test_logout_mock_clears_state(fake_session):
+    """logout() 在 mock 模式清除 actor / access_token / token_expires_at。"""
+    fake_session["actor"] = Actor("alice", "user")
+    fake_session["access_token"] = "jwt"
+    fake_session["token_expires_at"] = 999
+    auth.logout()
+    assert "actor" not in fake_session
+    assert "access_token" not in fake_session
+    assert "token_expires_at" not in fake_session
+
+
+def test_logout_mock_no_network(fake_session, monkeypatch):
+    """mock 模式 logout() 不打任何網路(_introspect 不被呼叫)。"""
+    called = {"n": 0}
+
+    def boom():
+        called["n"] += 1
+        return {}
+
+    monkeypatch.setattr(auth, "_introspect", boom)
+    auth.logout()
+    assert called["n"] == 0
+
+
+# --- logout bff 分支 ---
+
+def test_logout_bff_calls_do_logout_and_clears_state(bff_mode, fake_session, monkeypatch):
+    """bff logout:呼叫 _do_logout_bff 並清狀態。"""
+    fake_session["actor"] = Actor("alice", "user")
+    fake_session["access_token"] = "jwt"
+    called = {"n": 0}
+    monkeypatch.setattr(auth, "_do_logout_bff", lambda: called.__setitem__("n", 1))
+    auth.logout()
+    assert called["n"] == 1
+    assert "actor" not in fake_session
+    assert "access_token" not in fake_session
+
+
+def test_logout_bff_clears_state_even_on_network_error(bff_mode, fake_session, monkeypatch):
+    """bff logout:即使 _do_logout_bff 拋錯也清本地狀態(最佳努力)。"""
+    fake_session["actor"] = Actor("alice", "user")
+
+    def boom():
+        raise ApiError("連線失敗")
+
+    monkeypatch.setattr(auth, "_do_logout_bff", boom)
+    with pytest.raises(ApiError):
+        auth.logout()
+    assert "actor" not in fake_session
+
+
+def test_do_logout_bff_fetches_csrf_then_posts(bff_mode, fake_session, monkeypatch):
+    """_do_logout_bff:帶 _fetch_csrf 回傳的 CSRF token 和 cookie POST 到 logout 端點。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "rawcookie"})
+    monkeypatch.setattr(auth, "_fetch_csrf", lambda: "csrf-tok")
+    captured = []
+
+    def router(req):
+        captured.append(
+            {"method": req.method, "path": req.url.path, "headers": dict(req.headers)}
+        )
+        return httpx.Response(204)
+
+    _orig_client = httpx.Client  # 先捕捉原始 Client,避免 patch lambda 遞迴呼叫自身
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: _orig_client(transport=httpx.MockTransport(router))
+    )
+    auth._do_logout_bff()
+    assert len(captured) == 1
+    r = captured[0]
+    assert r["method"] == "POST"
+    assert r["path"] == "/api/auth/logout"
+    assert r["headers"].get("x-csrf-token") == "csrf-tok"
+    assert "rawcookie" in (r["headers"].get("cookie") or "")
+
+
+def test_fetch_csrf_calls_bff_endpoint_and_returns_token(bff_mode, fake_session, monkeypatch):
+    """_fetch_csrf:GET /api/csrf(帶 cookie)→ 回傳 csrfToken 字串。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "rawcookie"})
+    captured = []
+
+    def router(req):
+        captured.append({"path": req.url.path, "headers": dict(req.headers)})
+        return httpx.Response(200, json={"csrfToken": "tok-abc"})
+
+    _orig_client = httpx.Client
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kw: _orig_client(transport=httpx.MockTransport(router))
+    )
+    token = auth._fetch_csrf()
+    assert token == "tok-abc"
+    assert captured[0]["path"] == "/api/csrf"
+    assert "rawcookie" in (captured[0]["headers"].get("cookie") or "")

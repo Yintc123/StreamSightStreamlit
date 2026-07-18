@@ -141,4 +141,5 @@ def test_bff_auth_setting_defaults():
     s = get_settings()
     assert s.bff_session_path == "/api/auth/session"
     assert s.bff_logout_path == "/api/auth/logout"
+    assert s.bff_csrf_path == "/api/csrf"
     assert s.role_admin_value == 1
