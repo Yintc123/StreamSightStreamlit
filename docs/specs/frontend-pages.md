@@ -43,5 +43,6 @@ lib/
 - [技術架構](../architecture.md)(方案 B:Streamlit + FastAPI)
 - [設計系統 / 樣式規格](design-system.md)
 - [功能能力對照](feature-capability.md)
+- [資料來源抽象層(Mock 先行,之後換 API)](data-source.md)
 - [ADR 0001:即時架構](../decisions/0001-realtime-architecture.md)
 - [ADR 0002:Streamlit 為 API Client,不直接連 DB](../decisions/0002-streamlit-as-api-client.md)
