@@ -4,7 +4,7 @@
 
 - **原則**:純邏輯(資料轉換、頁碼計算、篩選條件組合)抽純函式放本檔，UI 綁定（`st.*` 呼叫）只作薄包裝。
 - **前提**:見 [應用骨架 §6](app-skeleton.md#6-lib-分層總表單一入口地圖)；錯誤呈現一律走 [`lib/errors.py`](error-handling.md)，不在此重複。
-- **放置**:`lib/ui.py`；對應測試：`tests/unit/test_ui.py`（純函式）與 `tests/app/`（AppTest 頁面行為）。
+- **放置**:`lib/ui.py`；對應測試：`tests/unit/test_ui.py`（純函式）與 `tests/app/test_ui_components.py`（AppTest 頁面行為）。
 
 ---
 
@@ -23,7 +23,7 @@
 
 ```python
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Optional, List
 try:
@@ -71,9 +71,10 @@ def filter_bar(
 ### 行為
 
 - 渲染：`st.columns` 並列 `st.selectbox`（分類）、`st.date_input`（時間範圍，若 `show_date`）、`st.text_input`（關鍵字，若 `show_keyword`）。
-- **狀態**：以 `key_prefix` 為命名空間在 `session_state` 讀寫目前篩選值（例如 `{key_prefix}_category`），避免多頁衝突。
+- **狀態初始化**：首次 rerun 時以 `session_state.setdefault(key, default)` 確保各 key 存在，預設值對應 `FilterParams` 欄位的預設（`category` → `categories[0]`、`keyword` → `""`、`date_from` / `date_to` → `None`）。
 - 每次 rerun 讀取目前 `session_state` 值作為元件預設，並在元件值改變時自動更新（`on_change` 或 Streamlit 元件天然回寫）。
 - 回傳本次 rerun 的 `FilterParams` 快照；**呼叫端**據此傳入資料查詢，不直接操作 `session_state`。
+- **與分頁的互動**：若同一頁同時使用 `pagination_controls`（共用相同 `key_prefix`），呼叫端應在偵測到篩選條件改變時（即本次快照 ≠ 上次快照）將 `{key_prefix}_page` 重設為 `1`，避免使用者停在無效的高頁碼。建議做法：將前次 `FilterParams` 存於 `session_state`，與本次比較，若不同則 `st.session_state[f"{key_prefix}_page"] = 1`。
 
 ### 分類清單慣例
 
@@ -126,15 +127,17 @@ metric_cards([
 ```python
 def pagination_controls(
     total: int,
-    size: int,
+    size: int,   # 前置條件：size >= 1
     key_prefix: str,
 ) -> int:   # 回傳當前頁碼（1-based）
 ```
 
 ### 行為
 
+- **前置條件**：`size >= 1`（呼叫端保證；傳入 0 行為未定義）。
 - 計算 `total_pages = ceil(total / size)`。
-- 以 `{key_prefix}_page`（`session_state` key）存目前頁碼，初始值 `1`。
+- 以 `{key_prefix}_page`（`session_state` key）存目前頁碼，首次以 `setdefault` 初始值 `1`。
+- 每次渲染前先呼叫 `_clamp_page`，確保儲存的頁碼在 `[1, total_pages]` 內（資料筆數減少或篩選條件重置後頁碼可能越界）。
 - 渲染：`st.columns([1, 6, 1])` — 左欄「‹ 上一頁」按鈕、中欄 `st.caption`、右欄「下一頁 ›」按鈕。
   - caption 格式：`第 {page} / {total_pages} 頁 · 共 {total} 筆`。
   - 首頁時左按鈕 `disabled=True`；末頁時右按鈕 `disabled=True`。
@@ -191,23 +194,91 @@ def empty_state(message: str = "目前沒有符合條件的資料") -> None:
 
 ### 純函式（`tests/unit/test_ui.py`）
 
-1. `FilterParams` 預設值正確（`category="全部"`、`keyword=""`、日期 `None`）。
-2. `_page_caption(1, 5, 47)` → `"第 1 / 5 頁 · 共 47 筆"`。
-3. `_clamp_page(0, 3)` → `1`；`_clamp_page(10, 3)` → `3`；`_clamp_page(2, 3)` → `2`。
-4. `metric_cards([])` 不拋例外（靜默）。
+| # | 測試 | 斷言 |
+|---|---|---|
+| 1 | `FilterParams` 預設值 | `category="全部"`, `keyword=""`, `date_from=None`, `date_to=None` |
+| 2 | `Metric` 預設值 | `delta=None`, `delta_color="normal"`, `help=None` |
+| 3 | `_page_caption(1, 5, 47)` | `"第 1 / 5 頁 · 共 47 筆"` |
+| 4 | `_clamp_page(0, 3)` | `1`（下界） |
+| 5 | `_clamp_page(10, 3)` | `3`（上界） |
+| 6 | `_clamp_page(2, 3)` | `2`（正常值不變） |
 
 ### AppTest（`tests/app/test_ui_components.py`）
 
-5. `filter_bar` 初始渲染包含 selectbox、text_input。
-6. `filter_bar` 不同 `key_prefix` 不互相污染（兩組元件共存於同頁）。
-7. `pagination_controls(total=0, ...)` 不渲染任何元件。
-8. `pagination_controls` 首頁時上一頁 disabled；末頁時下一頁 disabled。
+| # | 測試 | 斷言 |
+|---|---|---|
+| 7 | `empty_state("查無資料")` | 頁面含 `st.info` |
+| 8 | `metric_cards([])` | 不拋例外（靜默不渲染） |
+| 9 | `metric_cards([Metric("總計", 10)])` | 頁面含對應 metric 元件 |
+| 10 | `pagination_controls(total=0, size=20, key_prefix="t")` | 不渲染任何元件 |
+| 11 | `pagination_controls` 首頁 | 上一頁按鈕 `disabled=True` |
+| 12 | `pagination_controls` 末頁 | 下一頁按鈕 `disabled=True` |
+| 13 | `filter_bar` 初始渲染 | 頁面含 selectbox、text_input |
+| 14 | `filter_bar(show_date=False, ...)` | 頁面無 date_input |
+| 15 | `filter_bar(show_keyword=False, ...)` | 頁面無對應 text_input |
+| 16 | 兩組不同 `key_prefix` 的 `filter_bar` 共存 | 設定 prefix-A 的 category → 讀取 prefix-B 的 `session_state["{prefix_b}_category"]`，值仍為初始值 `"全部"`（各自 namespace 獨立） |
+| 17 | `filter_bar` 篩選值改變後 `pagination_controls` 頁碼重置 | 先停在第 2 頁，改變分類後 `session_state["{prefix}_page"]` 回到 `1` |
 
 ---
 
-## 9. 相關文件
+## 9. TDD 落地順序（Red → Green → Refactor）
+
+嚴格按 Red-Green-Refactor 循環，每次只推進一個行為：
+
+### Phase 1 — 純資料型別（無 Streamlit 依賴）
+- 測試 `FilterParams` 預設值（測試 #1）
+- 測試 `Metric` 預設值（測試 #2）
+
+### Phase 2 — 純函式
+- 測試 `_page_caption` 格式（測試 #3）
+- 測試 `_clamp_page` 邊界（測試 #4、#5、#6）
+
+### Phase 3 — `empty_state`（最薄 UI 綁定）
+- 測試 #7
+
+### Phase 4 — `metric_cards`
+- 測試 #8（空 list 靜默）→ 測試 #9（含 Metric 渲染）
+
+### Phase 5 — `pagination_controls`
+- 測試 #10（total=0 靜默）→ 測試 #11（首頁 disabled）→ 測試 #12（末頁 disabled）
+
+### Phase 6 — `filter_bar`
+- 測試 #13（初始渲染）→ 測試 #14（show_date=False）→ 測試 #15（show_keyword=False）→ 測試 #16（不同 prefix 不污染）→ 測試 #17（篩選改變時頁碼重置）
+
+### Phase 7 — 遷移既有頁面（在綠燈保護下替換）
+- 替換 `pages/data_management.py` 的內聯呼叫（見 §10），跑全套 `pytest` 確保既有測試不破壞。
+
+---
+
+## 10. 既有頁面遷移
+
+### `pages/data_management.py`
+
+Phase 7 完成後，分兩類處理：
+
+#### 替換（內聯呼叫 → `lib/ui.py` 等效元件）
+
+| 位置 | 現況 | 替換為 |
+|---|---|---|
+| 空狀態（`result.total == 0` 分支） | `st.info("目前範圍內沒有資料")` | `empty_state("目前範圍內沒有資料")` |
+| 分頁說明（else 分支底部） | `st.caption(f"第 {result.page} 頁 · 共 {result.total} 筆")` | `pagination_controls(result.total, 20, key_prefix="dm")` |
+
+#### 新增（目前頁面尚無此功能）
+
+| 位置 | 新增內容 |
+|---|---|
+| 列表頁頂端（資料查詢前） | `filter_bar(["全部", "感測器", "系統", "應用", "網路"], key_prefix="dm")` |
+
+> `filter_bar` 是**新功能**，不是舊程式碼替換，需搭配測試 #13–#17 先行實作。
+
+遷移前需確保 `tests/app/test_data_management.py` 全綠；遷移後重跑確認不破壞既有行為。
+
+---
+
+## 11. 相關文件
 
 - [應用骨架 §6](app-skeleton.md#6-lib-分層總表單一入口地圖)（lib 分層地圖）
 - [錯誤處理規格](error-handling.md)（`render_error` / `empty_state` 的錯誤邊界）
 - [設計系統](design-system.md)（色彩 token、元件樣式指引）
 - [前端頁面結構](frontend-pages.md)（各頁使用情境）
+- [資料管理頁規格](pages/03-data-management.md)（`filter_bar` / `pagination_controls` 首要使用方）
