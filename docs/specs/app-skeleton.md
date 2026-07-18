@@ -194,6 +194,7 @@ def build_pages(role: str) -> list:
 | `lib/data_source.py` | `DataSource`(Protocol)+ `get_data_source()` 工廠 | [資料來源](data-source.md) | ✅ |
 | `lib/mock_data_source.py` | `MockDataSource`(記憶體種子) | [資料來源](data-source.md) | ✅ |
 | `lib/api_client.py` | `ApiDataSource` + BFF/FastAPI 呼叫(帶 JWT) | auth-flow §6、data-source | ⬜(接 API 階段) |
+| `lib/request_id.py` | 對外呼叫的 `X-Request-ID` 關聯 ID(產生/附掛/讀回) | [Request ID 模組](request-id.md) | ⬜(接 API 階段) |
 
 ---
 
@@ -210,6 +211,7 @@ def build_pages(role: str) -> list:
 | `dm_page` | `int` | 資料管理頁 | 全部 | 列表當前頁(1-based) |
 | `dm_filters` | `dict` | 資料管理頁 | 全部 | `{category, keyword, sort, date_range}` |
 | `dm_editing_id` | `Optional[int]` | 資料管理頁 | 全部 | 編輯彈窗目標;`None`=未開 |
+| `last_request_id` | `Optional[str]` | `lib/api_client.py` | `api`/`bff` | 最近一次失敗呼叫的 `X-Request-ID`,供錯誤畫面顯示(見 [Request ID 模組](request-id.md)) |
 
 - 前綴約定:資料管理 `dm_`、即時監控 `rt_`、分析 `an_`、系統管理 `admin_`。
 - 清理:登出(bff)或切換使用者(mock)時,清掉 `access_token`、頁面私有狀態與相關快取。
