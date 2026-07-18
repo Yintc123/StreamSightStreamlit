@@ -246,32 +246,24 @@ def empty_state(message: str = "目前沒有符合條件的資料") -> None:
 - 測試 #13（初始渲染）→ 測試 #14（show_date=False）→ 測試 #15（show_keyword=False）→ 測試 #16（不同 prefix 不污染）→ 測試 #17（篩選改變時頁碼重置）
 
 ### Phase 7 — 遷移既有頁面（在綠燈保護下替換）
-- 替換 `pages/data_management.py` 的內聯呼叫（見 §10），跑全套 `pytest` 確保既有測試不破壞。
+
+> **`pages/data_management.py` 已完成遷移（見 §10）**；其他頁面（analytics、admin）有待同步。
 
 ---
 
 ## 10. 既有頁面遷移
 
-### `pages/data_management.py`
+### `pages/data_management.py`（已完成）
 
-Phase 7 完成後，分兩類處理：
+資料管理頁的工具列需要四種**不同觸發模式**（分類/排序/每頁筆數即時；關鍵字需按搜尋），`filter_bar` 的設計不支援此混合模式，因此**改為內嵌佈局**，並直接使用 `empty_state` 與 `pagination_controls`。
 
-#### 替換（內聯呼叫 → `lib/ui.py` 等效元件）
-
-| 位置 | 現況 | 替換為 |
+| 元件 | 狀態 | 說明 |
 |---|---|---|
-| 空狀態（`result.total == 0` 分支） | `st.info("目前範圍內沒有資料")` | `empty_state("目前範圍內沒有資料")` |
-| 分頁說明（else 分支底部） | `st.caption(f"第 {result.page} 頁 · 共 {result.total} 筆")` | `pagination_controls(result.total, 20, key_prefix="dm")` |
+| `empty_state` | ✅ 已替換 | 取代內聯 `st.info` |
+| `pagination_controls` | ✅ 已替換 | 取代手工分頁邏輯 |
+| `filter_bar` | ✅ 不採用 | 工具列改為 `st.columns([2,2,1,3])` 四元件內嵌；分類/排序/每頁筆數即時觸發，關鍵字以 `st.form` 包裹 |
 
-#### 新增（目前頁面尚無此功能）
-
-| 位置 | 新增內容 |
-|---|---|
-| 列表頁頂端（資料查詢前） | `filter_bar(["全部", "感測器", "系統", "應用", "網路"], key_prefix="dm")` |
-
-> `filter_bar` 是**新功能**，不是舊程式碼替換，需搭配測試 #13–#17 先行實作。
-
-遷移前需確保 `tests/app/test_data_management.py` 全綠；遷移後重跑確認不破壞既有行為。
+詳見[資料管理頁規格](pages/03-data-management.md#元件細節)。
 
 ---
 
@@ -281,4 +273,4 @@ Phase 7 完成後，分兩類處理：
 - [錯誤處理規格](error-handling.md)（`render_error` / `empty_state` 的錯誤邊界）
 - [設計系統](design-system.md)（色彩 token、元件樣式指引）
 - [前端頁面結構](frontend-pages.md)（各頁使用情境）
-- [資料管理頁規格](pages/03-data-management.md)（`filter_bar` / `pagination_controls` 首要使用方）
+- [資料管理頁規格](pages/03-data-management.md)（`pagination_controls` / `empty_state` 使用方；工具列採內嵌佈局）

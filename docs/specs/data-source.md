@@ -47,13 +47,14 @@ pages/data_management.py ──► DataSource(介面 / Protocol)
 Role     = Literal["user", "admin"]
 Category = Literal["感測器", "系統", "應用", "網路"]
 CATEGORIES: list[str] = ["感測器", "系統", "應用", "網路"]   # selectbox 與種子共用
-SORTABLE: list[str]   = ["title", "value", "category", "created_at"]
-DEFAULT_SORT = "created_at:desc"
+SORTABLE: list[str]   = ["id", "title", "value", "category", "created_at"]
+DEFAULT_SORT = "id:asc"
 
 @dataclass
 class Actor:              # 目前操作者(mock 由開發切換器提供;日後由認證提供)
     username: str
-    role: Role           # "user" | "admin"
+    role: Role               # "user" | "admin"
+    grade: Optional[str] = None  # admin → "super_admin"|"editor"|"viewer"; user → "free"|"premium"
 
 @dataclass
 class Record:
@@ -123,7 +124,7 @@ def can_edit(record: Record, actor: Actor) -> bool:
 
 **參數約定**
 - `page`:1-based;`size` 預設 20,UI 提供 20/50/100。
-- `sort`:字串 `"欄位:asc|desc"`,`欄位` ∈ `SORTABLE`,預設 `created_at:desc`;非法欄位 → `ValidationError`。
+- `sort`:字串 `"欄位:asc|desc"`,`欄位` ∈ `SORTABLE`,預設 `id:asc`;非法欄位 → `ValidationError`。
 - `category`:`None`=全部,否則需 ∈ `CATEGORIES`。
 - `keyword`:對 `title` 子字串比對,**不分大小寫**;空字串視同無篩選。
 
@@ -145,14 +146,14 @@ def can_edit(record: Record, actor: Actor) -> bool:
 
 mock 階段無認證,為了 demo 權限,於側邊欄提供切換器(僅 `DATA_SOURCE=mock` 時顯示):
 
-| 選項 | username | role | 用途 |
-|---|---|---|---|
-| Alice(一般) | `alice` | `user` | 只能編輯/刪除自己建立的 |
-| Bob(一般) | `bob` | `user` | 驗證「別人的資料按鈕停用」 |
-| Admin | `admin` | `admin` | 可編輯/刪除任何資料 |
+| 選項 | username | role | grade | 用途 |
+|---|---|---|---|---|
+| Super Admin | `admin` | `admin` | `super_admin` | 可編輯/刪除任何資料（最高權限） |
+| Editor | `editor` | `admin` | `editor` | 可編輯/刪除任何資料 |
+| Viewer | `viewer` | `admin` | `viewer` | 唯讀，所有編輯/刪除按鈕停用 |
 
 - 選擇結果寫入 `st.session_state["actor"]`(型別 `Actor`);頁面權限與 `create_record` 的 `created_by` 皆取自此。
-- 種子資料的 `created_by` 需涵蓋 `alice` / `bob` / `admin`,確保切換後看得到差異。
+- 種子資料的 `created_by` 循環套用 `alice` / `bob` / `admin`（mock 內部用名），確保列表有多筆不同創建者的資料。
 - **此切換器為 mock 專屬**,換真實 API(改由認證提供 `Actor`)時移除。
 
 ### 匯入驗證規則(`bulk_create`)
@@ -217,14 +218,16 @@ pages/
 
 依 CLAUDE.md「先失敗測試 → 最少實作 → 重構」,建議行為切分(每項先寫 RED):
 
-1. `can_edit(record, actor)` — Admin 恆真;創建者為真;他人為假。
-2. `MockDataSource.list_records` — 種子 40 筆、分頁切片、`total` 為篩選後筆數、預設排除軟刪除。
-3. 篩選 — `category` 精確、`keyword` 不分大小寫子字串。
-4. 排序 — 依 `sort` 欄位/方向正確;非法欄位拋 `ValidationError`。
-5. `create_record` — 欄位驗證;自動帶 `created_by`/時間戳;`total` +1。
-6. `update_record` / `delete_record` — 有權限成功(軟刪除設 `deleted_at`、更新改 `updated_at`);無權限拋 `PermissionDenied`;不存在拋 `RecordNotFound`。
-7. `bulk_create` — 合法列建立、非法列進 `errors`(不中斷)、超過 1000 列整體拒絕。
-8. 頁面(AppTest)— 切換使用者後按鈕停用狀態、分頁切換、送出後刷新。
+> **✅ = 已有測試且通過；❌ = 待補失敗測試**
+
+1. ✅ `can_edit(record, actor)` — Admin 恆真;創建者為真;他人為假。（`tests/unit/test_models.py`）
+2. ✅ `MockDataSource.list_records` — 種子 40 筆、分頁切片、`total` 為篩選後筆數、預設排除軟刪除。（`tests/unit/test_mock_data_source.py`）
+3. ✅ 篩選 — `category` 精確、`keyword` 不分大小寫子字串。（`tests/unit/test_mock_data_source.py`）
+4. ✅ 排序 — 依 `sort` 欄位/方向正確;非法欄位拋 `ValidationError`。（`tests/unit/test_mock_data_source.py`）
+5. ✅ `create_record` — 欄位驗證;自動帶 `created_by`/時間戳;`total` +1。（`tests/unit/test_mock_data_source.py`）
+6. ✅ `update_record` / `delete_record` — 有權限成功(軟刪除設 `deleted_at`、更新改 `updated_at`);無權限拋 `PermissionDenied`;不存在拋 `RecordNotFound`。（`tests/unit/test_mock_data_source.py`）
+7. ✅ `bulk_create` — 合法列建立、非法列進 `errors`(不中斷)、超過 1000 列整體拒絕。（`tests/unit/test_mock_data_source.py`）
+8. ✅ 頁面(AppTest + 匯入 unit)— 篩選、分頁、新增/編輯/刪除彈窗、匯入解析（`tests/app/test_data_management.py`、`tests/unit/test_import_utils.py`，見 [03-data-management.md § TDD 落地順序 8-1~8-8](pages/03-data-management.md#本頁-tdd-落地順序承接-data-sourcemd-第-8-步)）
 
 - 純邏輯測試放 `tests/unit/`,頁面行為放 `tests/app/`。
 
