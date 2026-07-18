@@ -10,13 +10,14 @@ from lib.models import Actor
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
 
 
-def test_app_runs_and_defaults_to_dashboard():
-    """全 mock 下進站:app 無例外,預設落在儀表板(app-skeleton §9、§10 步驟 5)。"""
+def test_app_runs_and_defaults_to_analytics():
+    """全 mock 下進站:app 無例外,預設落在資料分析(儀表板已移除;app-skeleton §9、§10 步驟 5)。"""
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not at.exception
     titles = [t.value for t in at.title]
-    assert "儀表板" in titles
+    assert "資料分析" in titles
+    assert "儀表板" not in titles
 
 
 def test_admin_can_open_admin_page():
@@ -31,13 +32,13 @@ def test_admin_can_open_admin_page():
 
 
 def test_bff_no_actor_redirects_to_login(monkeypatch):
-    """bff 模式無 cookie → actor is None → meta refresh 跳轉 Next.js 登入，不顯示儀表板。"""
+    """bff 模式無 cookie → actor is None → meta refresh 跳轉 Next.js 登入，不顯示任何業務頁。"""
     monkeypatch.setenv("AUTH_MODE", "bff")
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not at.exception
     titles = [t.value for t in at.title]
-    assert "儀表板" not in titles
+    assert "資料分析" not in titles
     # meta refresh 含 /login 路徑
     markdowns = [m.value for m in at.markdown]
     assert any("/login" in m for m in markdowns)

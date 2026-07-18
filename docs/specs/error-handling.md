@@ -84,8 +84,8 @@
 
 | 情境 | 頁面 | 依 §3 呈現 |
 |---|---|---|
-| 查詢 / 載入失敗 | 儀表板、資料管理、分析、admin | `ApiError` → `error` + 保留頁框 + 可重試(+ rid) |
-| 無資料 | 儀表板、資料管理、即時監控、分析 | `info` 取代主內容;分析另停用匯出 |
+| 查詢 / 載入失敗 | 資料管理、分析、admin | `ApiError` → `error` + 保留頁框 + 可重試(+ rid) |
+| 無資料 | 資料管理、即時監控、分析 | `info` 取代主內容;分析另停用匯出 |
 | 無權限操作 | 資料管理、admin | 按鈕預先停用;觸發則 `PermissionDenied` → `error` |
 | 找不到資料 | 資料管理 | `RecordNotFound` → `warning` + 刷新 |
 | 輸入不合法 | 資料管理(表單) | `ValidationError` → 表單旁 `error` |

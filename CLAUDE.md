@@ -6,7 +6,7 @@
 
 ## 專案概觀
 
-StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 5 頁多頁面架構，依登入角色動態註冊。**登入委派 Next.js 主前端**（`app.py` 偵測未登入時直接 meta refresh 跳轉，無 Streamlit 登入頁）。**Streamlit 為純前端 / API Client，不直接連 DB**：所有資料存取（含認證、CRUD、分析、系統管理）一律透過 `lib/api_client.py` 呼叫 FastAPI（StreamSightBackend）REST API；即時監控連後端 FastAPI WebSocket（見 [ADR 0002](docs/decisions/0002-streamlit-as-api-client.md)）。
+StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 4 頁多頁面架構，依登入角色動態註冊。**登入委派 Next.js 主前端**（`app.py` 偵測未登入時直接 meta refresh 跳轉，無 Streamlit 登入頁）。**Streamlit 為純前端 / API Client，不直接連 DB**：所有資料存取（含認證、CRUD、分析、系統管理）一律透過 `lib/api_client.py` 呼叫 FastAPI（StreamSightBackend）REST API；即時監控連後端 FastAPI WebSocket（見 [ADR 0002](docs/decisions/0002-streamlit-as-api-client.md)）。
 
 - 語言：Python 3.11+ ／ 套件管理：`pip` + `requirements.txt`（虛擬環境 `.venv`）
 - 框架：Streamlit
@@ -16,7 +16,7 @@ StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 
 規格文件集中於 `docs/`：
 
 - [技術架構](docs/architecture.md)（方案 A 純 Streamlit ／ 方案 B ＋ FastAPI）
-- [前端頁面結構](docs/specs/frontend-pages.md)（5 頁與存取控制；登入委派 Next.js）
+- [前端頁面結構](docs/specs/frontend-pages.md)（4 頁與存取控制；登入委派 Next.js）
 - [設計系統 / 樣式規格](docs/specs/design-system.md)（主題 Token 與 CSS 規範）
 - [錯誤處理](docs/specs/error-handling.md)（錯誤呈現契約單一事實來源：層級 / 文案 / request_id）
 - [設定模組](docs/specs/config.md)（`APP_ENV` 5 環境與完整設定項清單，對齊後端）
@@ -101,11 +101,10 @@ pytest
 ```
 app.py                     # 進入點：認證判斷 + st.navigation
 pages/
-├── dashboard.py           # 2. 儀表板
-├── data_management.py     # 3. 資料管理
-├── realtime_monitor.py    # 4. 即時監控（連 FastAPI WebSocket）
-├── analytics.py           # 5. 資料分析
-└── admin.py               # 6. 系統管理（僅 Admin 註冊）
+├── data_management.py     # 1. 資料管理
+├── realtime_monitor.py    # 2. 即時監控（連 FastAPI WebSocket）
+├── analytics.py           # 3. 資料分析（預設落地頁 default=True）
+└── admin.py               # 4. 系統管理（admin-only 系統，皆註冊；寫入限 grade≠viewer）
 lib/
 ├── api_client.py          # FastAPI REST 呼叫封裝（帶 JWT、逾時 / 錯誤處理）
 ├── auth.py                # 認證 / 角色 helper（呼叫後端取 JWT，不碰 DB）

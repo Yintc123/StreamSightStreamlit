@@ -25,17 +25,23 @@ def test_user_has_no_admin_page(capture_pages):
     pages = nav.build_pages("user")
     titles = [p.title for p in pages]
     assert "系統管理" not in titles
-    assert len(pages) == 4
+    assert len(pages) == 3
 
 
 def test_admin_has_admin_page(capture_pages):
     pages = nav.build_pages("admin")
     titles = [p.title for p in pages]
     assert "系統管理" in titles
-    assert len(pages) == 5
+    assert len(pages) == 4
 
 
-def test_default_page_is_dashboard(capture_pages):
+def test_dashboard_page_removed(capture_pages):
+    titles = [p.title for p in nav.build_pages("admin")]
+    assert "儀表板" not in titles
+
+
+def test_default_page_is_analytics(capture_pages):
     pages = nav.build_pages("user")
-    assert pages[0].title == "儀表板"
-    assert pages[0].default is True
+    defaults = [p for p in pages if p.default]
+    assert len(defaults) == 1
+    assert defaults[0].title == "資料分析"

@@ -279,7 +279,7 @@ class Alert:
 | `Metric` / `metric_cards()` | `lib/ui.py` | 即時指標列 | 直接用 |
 | `empty_state()` | `lib/ui.py` | 空緩衝呈現 | 直接用 |
 | `render_error()` | `lib/errors.py` | 接後端後失敗呈現 | 直接用 |
-| `st.fragment(run_every=...)` 模式 | 已用於 dashboard 規格 | 即時刷新，無第三方依賴 | 沿用模式 |
+| `st.fragment(run_every=...)` 模式 | Streamlit 內建 | 即時刷新，無第三方依賴 | 本頁即時刷新採用 |
 | `st.altair_chart` + Altair | Streamlit 內建整合（Altair 為既有相依） | 折線 / 柱狀圖，x 軸刻度可指定 `%H:%M:%S` | 由 `build_chart` 建構（`st.line_chart` 無法指定刻度時間格式，故改用） |
 | `rt_` session_state 前綴 | 本規格 §session_state | 緩衝 / tick / 閾值 | 沿用命名 |
 | nav 註冊（「即時監控」給所有登入者） | `lib/nav.py::build_pages` | 頁面已註冊 | **不用改** |

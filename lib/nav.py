@@ -24,10 +24,9 @@ _DEV_ACTORS = [
 def build_pages(role: str) -> List:
     """依角色回傳 st.Page 清單;僅 admin 追加系統管理頁。"""
     pages = [
-        st.Page("pages/dashboard.py", title="儀表板", default=True),
         st.Page("pages/data_management.py", title="資料管理"),
         st.Page("pages/realtime_monitor.py", title="即時監控"),
-        st.Page("pages/analytics.py", title="資料分析"),
+        st.Page("pages/analytics.py", title="資料分析", default=True),
     ]
     if role == "admin":
         pages.append(st.Page("pages/admin.py", title="系統管理"))

@@ -13,7 +13,7 @@
 | 函式 | 出現頁面 | 回傳 | 說明 |
 |---|---|---|---|
 | `filter_bar(categories, key_prefix)` | 資料管理、分析、Admin | `FilterParams` | 篩選列 UI，內部管理 session_state |
-| `metric_cards(metrics)` | 儀表板、分析、Admin | `None` | `st.columns + st.metric` 指標卡列 |
+| `metric_cards(metrics)` | 即時監控、分析、Admin | `None` | `st.columns + st.metric` 指標卡列 |
 | `pagination_controls(total, size, key_prefix)` | 資料管理、Admin | `int`（當前頁碼） | 上/下頁按鈕 + 頁碼 caption |
 | `empty_state(message)` | 全部頁面 | `None` | 查無資料時的 `st.info` 標準佔位 |
 
@@ -109,7 +109,7 @@ def metric_cards(metrics: List[Metric]) -> None:
 ### 使用範例
 
 ```python
-# 儀表板
+# 指標卡列（範例）
 metric_cards([
     Metric("資料總筆數", 12340),
     Metric("今日新增", 128, delta="+128", delta_color="normal"),
