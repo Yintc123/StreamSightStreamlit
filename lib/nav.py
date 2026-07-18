@@ -13,10 +13,11 @@ from lib import state
 from lib.models import Actor
 
 # 開發用切換器選項(僅 mock;換真實 API 後移除)。見 data-source §開發用切換器。
+# grade 對應後端 JWT grade claim：admin → AdminRole；user → UserTier
 _DEV_ACTORS = [
-    ("Alice(一般)", Actor("alice", "user")),
-    ("Bob(一般)", Actor("bob", "user")),
-    ("Admin", Actor("admin", "admin")),
+    ("Super Admin", Actor("admin",  "admin", grade="super_admin")),
+    ("Editor",      Actor("editor", "admin", grade="editor")),
+    ("Viewer",      Actor("viewer", "admin", grade="viewer")),
 ]
 
 

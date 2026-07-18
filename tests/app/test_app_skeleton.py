@@ -43,13 +43,6 @@ def test_bff_no_actor_redirects_to_login(monkeypatch):
     assert any("/login" in m for m in markdowns)
 
 
-def test_non_admin_cannot_open_admin_page():
-    """一般使用者未註冊系統管理頁:嘗試導入被擋,停在預設儀表板(比隱藏更安全)。"""
-    at = AppTest.from_file(APP_PATH)
-    at.session_state["actor"] = Actor("bob", "user")
-    at.run()
-    at.switch_page("pages/admin.py")
-    at.run()
-    titles = [t.value for t in at.title]
-    assert "系統管理" not in titles
-    assert "儀表板" in titles
+# build_pages 的存取控制邏輯（user 無法取得 admin 頁）已由
+# tests/unit/test_nav.py::test_user_has_no_admin_page 覆蓋；
+# mock 模式所有 dev actor 均為 admin 型別，AppTest 無法重現 user 情境，故不重複。
