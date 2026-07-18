@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# 讓測試從 repo root 直接 import lib.*
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"

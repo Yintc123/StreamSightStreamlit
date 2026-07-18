@@ -1,1 +1,14 @@
 .claude/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Streamlit（dev 本機設定不入版控，見 app-skeleton §8）
+.streamlit/secrets.toml
+
+# 環境變數
+.env
