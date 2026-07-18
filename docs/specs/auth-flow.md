@@ -27,6 +27,10 @@
 
 ## 1. 目的與範圍
 
+> ### 🔒 首要設計目標:瀏覽器永遠拿不到 JWT
+>
+> 本規格所有流程與取捨的**第一因**:JWT(FastAPI 的 Bearer access token)**全程不進瀏覽器**,只存在 **Streamlit Python server 記憶體**(`session_state`,不落檔 / log / 渲染)。「共享 cookie SSO」「向 BFF 換 token」「token 只存 server」等設計,都是為了守住這一條;評估任何替代方案時,**先問「會不會讓 JWT 暴露到瀏覽器」**。詳見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)。
+
 讓 **Streamlit(資料儀表板)** 與 **主前端(Next.js)** 共享同一顆 BFF session cookie,使用者在主前端登入後,進 Streamlit **免再次登入**(簡易 SSO)。
 
 本規格定義:
@@ -115,6 +119,8 @@ Streamlit 無法解 cookie,故由 BFF 提供 introspection。**採 Design B:BFF 
 **未認證(401)**:無 cookie / 解封失敗 / Redis 無對應 session → `401`,body 為前端標準錯誤封包。Streamlit 收到即視為「未登入」→ 導向主前端登入頁。
 
 > **信任邊界說明(最小權限)**:此端點把 access token 交給 Streamlit,但**只交這一顆**——Streamlit 拿不到 `SESSION_SECRET`、也連不到 Redis。因此即使 Streamlit 被攻破,損害框在**單一使用者、短命(access ~3h)、可撤銷**的 token,而非整個 session store。這正是「直接換 token」相對「換 sessionId 自己讀 Redis」的關鍵優勢(§1.1)。此為**刻意取捨**且與 [ADR 0002]「Streamlit 保管 token」一致,token **不進瀏覽器**。若要求 JWT **絕不進 Streamlit**,改採 §5「Design A」(代價:前端要 proxy 全部資料端點)。
+>
+> **「JWT 進 Streamlit」指哪一層(避免誤解)**:這裡的「Streamlit」指 **Python server**——JWT 存 `st.session_state["access_token"]`(伺服器端記憶體、per-session、不落檔 / 不 log,見 [app-skeleton §7](app-skeleton.md#7-session_state-契約單一真相))。**瀏覽器端(使用者)全程看不到 JWT**:api_client 由 server 端發出、Bearer 不經瀏覽器 cookie jar,瀏覽器只有那顆加密共享 cookie 與渲染後的 UI。因此兩層要分清:**瀏覽器 = 看不到(安全目標達成);Streamlit server = 記憶體持有這一顆短命 token**。附帶紀律:不得把 token 以 `st.write` / URL / 元件渲染到前端(靠測試覆蓋,對齊上方遮蔽要求)。
 
 ### 3.2 `POST /api/auth/logout`(新增)
 

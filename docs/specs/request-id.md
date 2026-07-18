@@ -73,6 +73,11 @@ def set_current(request_id: Optional[str]) -> None:
 def get_current() -> Optional[str]:
     """取當前請求 ID;無則 None。"""
     ...
+
+def init_logging() -> None:
+    """冪等:把讀 get_current() 的 logging.Filter 掛到 'streamsight.api' logger(見 §4.2)。
+    由 app.py 啟動時呼叫一次;重複呼叫不重複掛載。"""
+    ...
 ```
 
 - **產生器可注入**:`gen` 參數預設 `uuid.uuid4`,測試傳固定 `gen` 即可斷言。
@@ -107,7 +112,7 @@ def get_current() -> Optional[str]:
   ```
 - **等級對應**:2xx/3xx → `INFO`;4xx → `WARNING`;5xx / 逾時 / 連線錯誤 → `ERROR`。
 - **遮蔽(硬性)**:只記 `path`(去 query string);**絕不記** `Authorization`、cookie、JWT、請求 / 回應 body。
-- **環境注入(可選但建議)**:掛一個 `logging.Filter`,從 `get_current()` 把 `request_id` 補進**每一筆** log record;如此連非 api_client 的 log 也自帶當前 rid,無需逐處傳參。
+- **環境注入(可選但建議)**:掛一個 `logging.Filter`,從 `get_current()` 把 `request_id` 補進**每一筆** log record;如此連非 api_client 的 log 也自帶當前 rid,無需逐處傳參。此掛載封裝為模組匯出的 `init_logging()`(冪等),由 `app.py` 啟動時呼叫一次(見 [app-skeleton §3](app-skeleton.md#3-進入點-apppy-職責與順序) 步驟 ②′)。
 
 ### 4.3 錯誤契約與呈現(UX)
 
@@ -188,6 +193,6 @@ tests/unit/
 └── test_api_client.py # 整合(測 8–11),gated on api_client
 ```
 
-- **logging filter**(§4.2 環境注入)可放 `lib/request_id.py` 或 logging 設定處;於 `app.py` 啟動時掛到 `streamsight.api` logger 一次。
+- **logging filter**(§4.2 環境注入)置於 `lib/request_id.py`,以冪等的 `init_logging()` 匯出;於 `app.py` 啟動時掛到 `streamsight.api` logger 一次(app-skeleton §3 步驟 ②′)。
 
 > 於 [應用骨架 §6 lib 分層總表](app-skeleton.md#6-lib-分層總表單一入口地圖)登錄本模組;骨架必要性為 **接 API 階段**(全 mock 下休眠)。

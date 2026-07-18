@@ -18,6 +18,8 @@ StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 
 - [技術架構](docs/architecture.md)（方案 A 純 Streamlit ／ 方案 B ＋ FastAPI）
 - [前端頁面結構](docs/specs/frontend-pages.md)（6 頁與存取控制）
 - [設計系統 / 樣式規格](docs/specs/design-system.md)（主題 Token 與 CSS 規範）
+- [錯誤處理](docs/specs/error-handling.md)（錯誤呈現契約單一事實來源：層級 / 文案 / request_id）
+- [設定模組](docs/specs/config.md)（`APP_ENV` 5 環境與完整設定項清單，對齊後端）
 
 ---
 

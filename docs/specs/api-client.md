@@ -69,6 +69,7 @@ class ApiError(Exception):
 
 - `NotAuthenticated` 為 `lib/`(auth 或 models)自訂例外;`app.py` 攔到即清狀態並導向主前端登入(auth-flow §4.4)。
 - 域例外(`RecordNotFound`/`PermissionDenied`/`ValidationError`)沿用 `models.py`,**與 `MockDataSource` 同契約**——頁面錯誤處理 mock/api 一致(見 [03 頁面](pages/03-data-management.md#狀態與錯誤處理))。
+- **本表(狀態→例外映射)為權威**;例外**如何呈現給使用者**(層級 / 文案 / 是否附 `request_id`)的權威在 [錯誤處理規格 §3](error-handling.md#3-呈現契約本規格唯一權威),頁面一律引用該表,不自訂。
 
 ### 3.3 後端錯誤封包
 

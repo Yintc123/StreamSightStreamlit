@@ -111,6 +111,21 @@ Streamlit 不保證穩定 class,需精準選取時依序優先:
 | 一般告警 | warning | 即時監控、儀表板 |
 | 嚴重 / 刪除 | danger | 即時監控、資料管理 |
 
+## 訊息呈現規範
+
+錯誤 / 告警 / 空狀態訊息的**視覺格式**由此規範;**呈現契約**(哪種例外用哪個層級、文案、是否附 `request_id`)的權威在 [錯誤處理規格 §3](error-handling.md#3-呈現契約本規格唯一權威),各頁一律引用,不自訂。
+
+| 層級 | 元件 | 色 Token | 用途 |
+|---|---|---|---|
+| error | `st.error` | danger | 操作失敗、系統 / 傳輸故障、輸入需修正 |
+| warning | `st.warning` | warning | 可恢復 / 暫時性 / 降級中(WS 重連、找不到目標) |
+| info | `st.info` | 中性 / secondary | 空狀態、登入前引導 |
+
+- **Icon**:一律用 `st.error` / `st.warning` / `st.info` 內建圖示,不自繪。
+- **`request_id`**:僅傳輸層錯誤(`ApiError`)附上,置於訊息**末端**、以**等寬字**呈現,格式「錯誤代碼:`st-a1b2…`」(見 [request-id §4.3](request-id.md))。
+- **空狀態**:`st.info` + 一行說明,**取代主內容區**(而非疊加);不揭露技術細節。
+- **禁止**:後端原文 / stack trace / SQL / token 出現在 UI 訊息;技術細節只進結構化 log。
+
 ## 檔案結構
 
 ```
@@ -128,6 +143,7 @@ app.py                     # set_page_config + load_css()
 
 ## 相關文件
 
+- [錯誤處理](error-handling.md)(訊息呈現契約:層級 / 文案 / request_id)
 - [應用骨架 / 基礎架構](app-skeleton.md)
 - [前端頁面結構](frontend-pages.md)
 - [技術架構](../architecture.md)

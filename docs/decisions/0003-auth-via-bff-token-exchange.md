@@ -5,6 +5,12 @@
 - 關聯:[ADR 0002](0002-streamlit-as-api-client.md)(Streamlit 為純 API Client)、[認證流程規格](../specs/auth-flow.md)、[頁面規格:登入 / 註冊](../specs/pages/01-login.md)
 - 外部參考:`StreamSightFrontend`(Next.js BFF)`docs/specs/001-bff-infrastructure.md` 及子 spec `001b`(session-store)/`001c`(session-service)/`001d`(csrf);`StreamSightBackend`(FastAPI,JWT Bearer)
 
+> ## 🔒 首要設計目標:瀏覽器永遠拿不到 JWT
+>
+> 這是本 ADR 與整套認證架構的**第一因**——底下每個決策(Streamlit 為純 API Client、唯一 BFF、換 token 而非讀 Redis、JWT 只存 server 記憶體)都是為了守住這一條而推導出來的。**讀本 ADR 時,請以「是否讓 JWT 暴露到瀏覽器」作為衡量每個方案的首要標準。**
+>
+> JWT(FastAPI 的 Bearer access token)**全程不進瀏覽器**:它只在 **Streamlit Python server 記憶體**(`session_state`,不落檔 / log / 渲染);使用者端只有一顆加密共享 cookie 與渲染後 UI。這也是下方 Design A/B/C 取捨的共同量尺——B 讓 JWT 進 Streamlit **server**(不進瀏覽器)、A 連 server 都不進、C 則連信任根都外流。
+
 ## 背景
 
 StreamSight 有多個前端共用同一批使用者:**主前端**(`StreamSightFrontend`,Next.js)與本專案 **Streamlit 儀表板**。目標是讓使用者**在主前端登入後,進 Streamlit 免再次登入**(簡易 SSO)。
@@ -135,7 +141,7 @@ FastAPI(直連,處理所有業務 / 資料 / WebSocket 即時監控)
 
 ## 理由
 
-- **資安**:`SESSION_SECRET` 與 Redis 留在 BFF;Streamlit 被攻破時,損害被框在**單一使用者、短命且可撤銷的 token**,而非整個系統的信任根。
+- **資安(首要)**:守住「**瀏覽器拿不到 JWT**」這條首要設計目標——JWT 只進 Streamlit server 記憶體、不進使用者端;`SESSION_SECRET` 與 Redis 留在 BFF;Streamlit 被攻破時,損害被框在**單一使用者、短命且可撤銷的 token**,而非整個系統的信任根。
 - **一致性**:資料平面維持 Streamlit → FastAPI 直連,延續 [ADR 0002]。
 - **前端改動最小**:只需新增一個 introspection 端點(+ logout),重用 BFF 既有、已測試的解封 / Redis / refresh 邏輯,**不在 Python 重刻 crypto 與併發**。
 - **契約耦合而非實作耦合**:B 只耦合一個 HTTP 端點的回應形狀(鬆);C 耦合 crypto 格式 + schema + secret(緊)。

@@ -30,8 +30,8 @@ class Actor:
 |---|---|---|---|
 | 身分出口 | `resolve_actor() -> Optional[Actor]` | 全部 | `app.py` 唯一入口;吸收 mock/bff 差異(§3) |
 | role 映射 | `map_role(raw) -> Literal["user","admin"]` | bff | 後端數值 role → 字串(§4) |
-| 取 token | `get_access_token() -> str` | bff | 供 api_client 帶 Bearer;來源 `session_state["access_token"]` |
-| 換 token | `refresh_token() -> str` | bff | 重呼 introspection、回寫 token、回傳新值;失敗拋 `NotAuthenticated` |
+| 取 token | `get_access_token() -> str` | bff | 供 api_client 帶 Bearer;經 [`state.get_token()`](app-skeleton.md#71-libstatepy-helper-契約) 讀 `session_state["access_token"]` |
+| 換 token | `refresh_token() -> str` | bff | 重呼 introspection、經 `state.set_token()` 回寫、回傳新值;失敗拋 `NotAuthenticated` |
 | 取 cookie | `raw_cookie() -> Optional[str]` | bff | 從 `st.context.cookies` 取加密 session cookie 原值,供 introspection 轉發 |
 | 登出 | `logout() -> None` | bff | 呼叫 BFF logout + 清狀態/快取(見 auth-flow §4.5) |
 

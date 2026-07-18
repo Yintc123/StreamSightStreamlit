@@ -25,16 +25,19 @@ Streamlit 前端切分為 6 個頁面,以 `st.navigation` + `st.Page` 組成,並
 ```
 app.py                        # 進入點:認證判斷 + st.navigation
 pages/
+├── gate.py                   # 1. 未登入導向頁(僅 bff 未登入時註冊)
 ├── dashboard.py              # 2. 儀表板
 ├── data_management.py        # 3. 資料管理
 ├── realtime_monitor.py       # 4. 即時監控(連 FastAPI WebSocket)
 ├── analytics.py              # 5. 資料分析
 └── admin.py                  # 6. 系統管理(僅 Admin 註冊)
-lib/
+lib/                          # 本清單僅摘要;完整權威地圖見 app-skeleton §6
 ├── api_client.py             # FastAPI REST 呼叫封裝(帶 JWT、逾時 / 錯誤處理)
 ├── auth.py                   # 認證 / 角色 helper(呼叫後端取得 JWT,不碰 DB)
 └── state.py                  # session_state helper(存 token / 角色)
 ```
+
+> `lib/` 完整分層(`config`/`theme`/`nav`/`models`/`data_source`/`mock_data_source`/`request_id`/`errors` 等)以 [應用骨架 §6](app-skeleton.md#6-lib-分層總表單一入口地圖) 為單一真相,本頁不重列。
 
 > **資料存取原則**(見 [ADR 0002](../decisions/0002-streamlit-as-api-client.md)):所有頁面的資料存取一律透過 `lib/api_client.py` 呼叫 FastAPI,**Streamlit 不直接連 DB**。
 
