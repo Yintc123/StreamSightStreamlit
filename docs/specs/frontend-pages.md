@@ -6,7 +6,7 @@ Streamlit 前端切分為 6 個頁面,以 `st.navigation` + `st.Page` 組成,並
 
 | # | 頁面 | 對應模組 | 存取權限 | 頁內分頁(tabs) | 規格 |
 |---|---|---|---|---|---|
-| 1 | 登入 / 註冊 | 模組 1 認證 | 未登入 | 登入 / 註冊 | [規格](pages/01-login.md) |
+| 1 | 未登入導向頁(Auth Gate) | 模組 1 認證 | 未登入 | —(導向主前端登入) | [規格](pages/01-login.md) |
 | 2 | 儀表板 / 首頁 | 總覽 | 已登入 | — | [規格](pages/02-dashboard.md) |
 | 3 | 資料管理 | 模組 2 | 已登入(編輯/刪除限創建者或 Admin) | 列表 / 新增 / 匯入 | [規格](pages/03-data-management.md) |
 | 4 | 即時監控 | 模組 3 | 已登入 | 即時圖表 / 告警 | [規格](pages/04-realtime-monitor.md) |
@@ -15,8 +15,8 @@ Streamlit 前端切分為 6 個頁面,以 `st.navigation` + `st.Page` 組成,並
 
 ## 存取控制
 
-- 登入後 JWT 與角色存於 `st.session_state`;角色由後端 token / `/me` 取得。
-- 未登入時只註冊「登入 / 註冊」頁面。
+- 認證採 **Design B**(見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)):auth gate 讀共享 cookie → 經主前端 BFF `GET /api/auth/session` 換取身分 / role 與短命 JWT,存於 `st.session_state`。
+- 未登入時只註冊「未登入導向頁」,由該頁**導向主前端登入**(Streamlit 不自建登入 / 註冊表單)。
 - 非 Admin 時**動態不註冊**「系統管理」頁面(比隱藏連結更安全)。
 - 頁面內以 `st.tabs` 再分子功能。
 
