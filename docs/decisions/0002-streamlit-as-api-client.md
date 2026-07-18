@@ -28,7 +28,8 @@ ADR 0001 採方案 B(Streamlit + FastAPI),但當時的分工是**兩服務共用
 ## 影響
 
 - **前端新增 API Client 層**:`lib/api_client.py` 封裝 REST 呼叫,統一帶 `Authorization: Bearer <JWT>`、處理逾時 / 重試 / 錯誤轉譯。
-- **認證改走 API**:登入 / 註冊呼叫後端 auth 端點取得 JWT,存於 `st.session_state`;角色由 token / `/me` 取得。**前端不再用 `streamlit-authenticator`,也不自行雜湊密碼**。
+- **認證改走 API**:~~登入 / 註冊呼叫後端 auth 端點取得 JWT~~,存於 `st.session_state`;角色由 token / `/me` 取得。**前端不再用 `streamlit-authenticator`,也不自行雜湊密碼**。
+  > ⚠️ **此細節已由 [ADR 0003](0003-auth-via-bff-token-exchange.md) 修訂(Design B)**:Streamlit **不直接呼叫 FastAPI 登入端點**;登入 / 註冊**委派主前端 BFF**,Streamlit 經 `GET /api/auth/session` **introspection** 換得身分與短命 JWT。「資料存取一律經 API、不連 DB、只保管 token」的原則**不變**。
 - **移除前端 DB 存取**:Streamlit 端不持有 DB 連線、不寫 SQL;分頁 / 篩選 / 聚合改用 API 查詢參數。
 - **匯入 / 匯出**:CSV/JSON 匯入把解析後資料送 API 批量建立;Excel 匯出可由前端以 API 取回的資料產生,或呼叫後端匯出端點(擇一,見各頁規格)。
 - **即時監控不變**:仍由 FastAPI 生成 + `/ws/live` 推送。

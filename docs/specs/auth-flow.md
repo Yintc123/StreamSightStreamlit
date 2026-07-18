@@ -235,7 +235,7 @@ sequenceDiagram
 | 層 | 檔案 | 職責 | 測試 |
 |---|---|---|---|
 | 設定 | `lib/config.py` | BFF base URL、cookie 名稱、introspection / logout 路徑、FastAPI base URL、逾時 | unit |
-| 認證邏輯 | `lib/auth.py` | **純函式**:讀 cookie 值、呼叫 introspection、解析回應為 `Identity`/未認證、`role` 數值→`"admin"/"user"` 映射、判斷是否需 refresh。**對 api_client 的接縫**:`get_access_token()`(取當前 JWT)、`refresh_token()`(重 introspect + 回寫 token,失敗拋 `NotAuthenticated`)、`raw_cookie()`(取 `st.context.cookies` 原值供轉發) | unit(mock API client) |
+| 認證邏輯 | `lib/auth.py` | **純函式**:讀 cookie 值、呼叫 introspection、解析回應為 `Actor`/未認證、`role` 數值→`"admin"/"user"` 映射、判斷是否需 refresh。**對 api_client 的接縫**:`get_access_token()`(取當前 JWT)、`refresh_token()`(重 introspect + 回寫 token,失敗拋 `NotAuthenticated`)、`raw_cookie()`(取 `st.context.cookies` 原值供轉發)。完整模組契約見 [Auth 模組規格](auth.md) | unit(mock API client) |
 | API 呼叫 | `lib/api_client.py` | 封裝 BFF introspection、FastAPI 業務呼叫(帶 Bearer)、401→refresh 重試、逾時/錯誤轉譯 | unit(mock `requests`) |
 | 狀態 | `lib/state.py` | `session_state` 讀寫 helper(user / role / token) | unit |
 | 導向 | `lib/nav.py`(或併入 auth) | 產生「導向主前端登入/註冊」的 JS/redirect helper | unit(產出字串)+ AppTest |
@@ -276,7 +276,7 @@ sequenceDiagram
 ### `tests/unit/`
 - `test_auth.py`
   - 無 cookie → 回未認證(不呼叫 BFF)。
-  - 有 cookie + BFF 200 → 回 `Identity(user, role)`,`role=1`→`"admin"`、其餘→`"user"`。
+  - 有 cookie + BFF 200 → 回 `Actor(username, role)`,`role=1`→`"admin"`、其餘→`"user"`。
   - BFF 401 → 回未認證,並標記需清狀態。
   - `expiresAt - now < 門檻` → 判定需 refresh。
 - `test_api_client.py`(mock `requests`)

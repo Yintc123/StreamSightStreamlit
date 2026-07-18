@@ -76,7 +76,7 @@ flowchart TB
     WSC -- "WebSocket 長連線" --> WS
 ```
 
-**資料流程**:Streamlit 所有資料操作(登入 / CRUD / 查詢 / 分析 / 系統管理)一律經 API Client 呼叫 FastAPI REST 端點,由 FastAPI 存取 DB 後回傳;Streamlit 端不持有 DB 連線。
+**資料流程**:Streamlit 所有資料操作(CRUD / 查詢 / 分析 / 系統管理)一律經 API Client 帶 Bearer JWT 呼叫 FastAPI REST 端點,由 FastAPI 存取 DB 後回傳;Streamlit 端不持有 DB 連線。**認證例外**:登入委派主前端 BFF、Streamlit 經 BFF introspection 取 token(Design B,見 [ADR 0003](decisions/0003-auth-via-bff-token-exchange.md)),圖中「認證」REST 端點指後端吃 Bearer 的 `/auth/me` 等,非 Streamlit 直打的登入端點。
 
 **即時流程**:FastAPI 生成器每秒產生資料 → 寫入 DB 並透過 `/ws/live` 主動推送 → 前端 WebSocket 元件即時更新圖表;超閾值時一併推送告警。
 
@@ -90,13 +90,13 @@ flowchart TB
 | 3. 即時監控 | `st.fragment` 輪詢 | FastAPI WebSocket 推送 |
 | 4. 資料分析 | Streamlit 服務層 + DB | FastAPI REST API(Streamlit 呼叫) |
 | 5. 系統管理 | Streamlit 服務層 + DB | FastAPI REST API(Streamlit 呼叫) |
-| 1. 認證 | Streamlit 自行雜湊 / 查 DB | FastAPI 認證 API(JWT) |
+| 1. 認證 | Streamlit 自行雜湊 / 查 DB | 登入委派主前端 BFF;Streamlit 經 introspection 取短命 JWT([ADR 0003](decisions/0003-auth-via-bff-token-exchange.md)) |
 
 ## 技術選型建議
 
 - **資料庫**:僅由 FastAPI 存取(開發 SQLite / 正式 Postgres);Streamlit 端不連 DB。
-- **API Client**:Streamlit 以 `httpx`(或 `requests`)呼叫後端 REST,統一帶 JWT。
-- **認證**:走 FastAPI 認證 API 取得 JWT,存於 `st.session_state`;**不使用 `streamlit-authenticator`、不在前端雜湊密碼**。
+- **API Client**:Streamlit 以 `httpx` 呼叫後端 REST,統一帶 Bearer JWT;細節見 [API Client 規格](specs/api-client.md)。
+- **認證(Design B,見 [ADR 0003](decisions/0003-auth-via-bff-token-exchange.md))**:登入 / 註冊**委派主前端 BFF**(Streamlit 無法 `Set-Cookie`);Streamlit 讀共享 cookie → 經 BFF `GET /api/auth/session` **introspection** 換得身分與短命 JWT,存於 `st.session_state`。**不直接呼叫 FastAPI 登入端點、不使用 `streamlit-authenticator`、不在前端雜湊密碼**。流程見 [認證流程](specs/auth-flow.md)。
 - **圖表**:`st.line_chart` / `st.bar_chart`,進階用 Plotly。
 - **Excel 匯出**:以 API 取回的資料在前端用 `openpyxl` 產生,或呼叫後端匯出端點。
 - **即時**:採方案 B,FastAPI WebSocket 推送。
