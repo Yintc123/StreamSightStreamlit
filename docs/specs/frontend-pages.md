@@ -7,18 +7,21 @@ Streamlit 前端切分為 5 個頁面,以 `st.navigation` + `st.Page` 組成,並
 | # | 頁面 | 對應模組 | 存取權限 | 頁內分頁(tabs) | 規格 |
 |---|---|---|---|---|---|
 | 1 | 儀表板 / 首頁 | 總覽 | 已登入 | — | [規格](pages/02-dashboard.md) |
-| 2 | 資料管理 | 模組 2 | 已登入(編輯/刪除限創建者或 Admin) | 列表 / 新增 / 匯入 | [規格](pages/03-data-management.md) |
-| 3 | 即時監控 | 模組 3 | 已登入 | 即時圖表 / 告警 | [規格](pages/04-realtime-monitor.md) |
+| 2 | 資料管理 | 模組 2 | 已登入；寫入限 `grade != viewer` | 列表 / 新增 / 匯入 | [規格](pages/03-data-management.md) |
+| 3 | 即時監控 | 模組 3 | 已登入 | —（單頁：即時圖表＋告警） | [規格](pages/04-realtime-monitor.md) |
 | 4 | 資料分析 | 模組 4 | 已登入 | 統計 / 趨勢 / 匯出 | [規格](pages/05-analytics.md) |
-| 5 | 系統管理 | 模組 5 | **僅 Admin** | 使用者 / 權限 / 日誌 / DB 狀態 | [規格](pages/06-admin.md) |
+| 5 | 系統管理 | 模組 5 | 已登入皆可讀；寫入限 `grade != viewer` | 使用者 / 權限 / 日誌 / DB 狀態 | [規格](pages/06-admin.md) |
 
 > **未登入導向**:由 `app.py` 直接處理(非頁面)。詳見 [Auth Gate 導向規格](pages/01-login.md)。
 
-## 存取控制
+## 存取控制（本節為存取軸的單一真相）
 
-- 認證採 **Design B**(見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)):auth gate 讀共享 cookie → 經主前端 BFF `GET /api/auth/session` 換取身分 / role 與短命 JWT,存於 `st.session_state`。
+- 認證採 **Design B**(見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)):auth gate 讀共享 cookie → 經主前端 BFF `GET /api/auth/session` 換取身分 / `role` / `grade` 與短命 JWT,存於 `st.session_state`。
 - 未登入時 `app.py` 直接 meta refresh 跳轉 Next.js 登入頁(**不註冊任何業務頁**)。
-- 非 Admin 時**動態不註冊**「系統管理」頁面(比隱藏連結更安全)。
+- **本系統為 admin-only**:只有 `role == "admin"` 的身分能進入 StreamSight(由後端 / BFF 於發證時保證),故 `role` 在本前端**實質恆為 `"admin"`**;**真正的存取軸是 `grade`**——`super_admin` / `editor` / `viewer`(對應後端 AdminRole)。
+- **讀取**:三種 grade 皆可讀**所有頁**(含系統管理),不做 grade gate。
+- **寫入**:一律限 **`grade != "viewer"`**(`super_admin` / `editor` 可寫,`viewer` 唯讀);判斷用純函式 **`can_write(actor)`**(單一真相)。資料管理的 CRUD 與系統管理的帳號停用 / 角色變更**共用此條**;`viewer` 一律以按鈕停用呈現,後端再強制驗證(深度防禦)。
+- **頁面註冊**:`build_pages(role)` 依 `role` 動態組頁;因本系統只有 admin role,**五頁皆註冊給所有登入者**。原「非 Admin 不註冊系統管理頁」是 `role == "user"` 存在時的深度防禦,本部署不會觸發,保留作為 latent 防線(見[應用骨架 §5](app-skeleton.md#5-導覽與頁面註冊build_pages))。
 - 頁面內以 `st.tabs` 再分子功能。
 
 ## 檔案結構
@@ -30,7 +33,7 @@ pages/
 ├── data_management.py        # 2. 資料管理
 ├── realtime_monitor.py       # 3. 即時監控(連 FastAPI WebSocket)
 ├── analytics.py              # 4. 資料分析
-└── admin.py                  # 5. 系統管理(僅 Admin 註冊)
+└── admin.py                  # 5. 系統管理(admin-only 系統,皆註冊;寫入限 grade≠viewer)
 lib/                          # 本清單僅摘要;完整權威地圖見 app-skeleton §6
 ├── api_client.py             # FastAPI REST 呼叫封裝(帶 JWT、逾時 / 錯誤處理)
 ├── auth.py                   # 認證 / 角色 helper(呼叫後端取得 JWT,不碰 DB)

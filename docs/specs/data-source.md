@@ -90,19 +90,32 @@ class ImportResult:
 
 ### 權限純函式
 
+本系統為 **admin-only**:所有登入者 `role == "admin"`,存取軸為 `grade`(`super_admin` / `editor` / `viewer`);寫入一律限 `grade != "viewer"`。見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
+
 ```python
+def can_write(actor: Actor) -> bool:
+    """寫入 gate(資料 CRUD 與系統管理提權操作共用)。grade != "viewer" → 可寫。"""
+    if actor.role == "admin":
+        return actor.grade != "viewer"
+    return False                              # role == "user" 為 latent 分支(本部署不出現)
+
 def can_edit(record: Record, actor: Actor) -> bool:
-    return actor.role == "admin" or record.created_by == actor.username
+    """記錄層編輯權限。admin → 委派 can_write(去重,單一真相);user(latent) → 限創建者。"""
+    if actor.role == "admin":
+        return can_write(actor)
+    return record.created_by == actor.username
 ```
 
-- 供 mock 來源(擋寫入)與頁面(按鈕 `disabled`)共用,單一真相、便於單元測試。
+- **`can_write` 是寫入權限的唯一真相**;`can_edit` 的 admin 分支一律委派 `can_write`,不重寫 `grade != "viewer"` 字面,避免兩處漂移。
+- 供 mock 來源(擋寫入)與頁面(按鈕 `disabled`)共用、便於單元測試。
+- 本部署下 `can_edit(record, actor) == can_write(actor)`(無 user role,創建者分支不觸發);系統管理頁只需 `can_write`(無 record)。
 
 ### 例外
 
 | 例外 | 觸發 | 對應後端 |
 |---|---|---|
 | `RecordNotFound` | `get/update/delete` 遇不存在或已軟刪除的 `id` | 404 |
-| `PermissionDenied` | `update/delete` 的 `actor` 非創建者且非 Admin | 403 |
+| `PermissionDenied` | `create/update/delete` 的 `actor` 無寫入權限(`grade == "viewer"`;latent: 非創建者的 user) | 403 |
 | `ValidationError` | 建立/更新欄位不合法(必填空、`category` 不在清單、`value` 非數) | 422 |
 
 > 兩者為 `lib/` 自訂例外(避免與內建 `PermissionError` 混淆);頁面攔截後以 `st.error` / 停用按鈕呈現。

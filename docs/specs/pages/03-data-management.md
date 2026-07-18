@@ -2,8 +2,8 @@
 
 - 頁面編號:3
 - 對應模組:模組 2 資料管理
-- 存取權限:已登入(讀取/建立皆可;**編輯/刪除限該筆創建者或非 Viewer Admin**)
-- 導覽:一般使用者可見
+- 存取權限:已登入皆可讀取/建立;**編輯/刪除限 `grade != "viewer"`**(`super_admin` / `editor` 可寫,`viewer` 唯讀)。本系統為 admin-only,存取軸為 grade,見[前端頁面結構 §存取控制](../frontend-pages.md#存取控制本節為存取軸的單一真相)。
+- 導覽:所有登入者可見
 - 相關:[前端頁面結構](../frontend-pages.md)、[設計系統](../design-system.md)、[功能能力對照](../feature-capability.md)、[資料來源抽象層(Mock 先行)](../data-source.md)、[ADR 0002](../decisions/0002-streamlit-as-api-client.md)
 
 ## 目的
@@ -248,7 +248,8 @@ with import_tab:
 | `CATEGORIES` | `["感測器", "系統", "應用", "網路"]`（selectbox 直接用） |
 | `SORTABLE` | `["id", "title", "value", "category", "created_at"]` |
 | `DEFAULT_SORT` | `"id:asc"` |
-| `can_edit(record, actor)` | 權限純函式：admin + grade=`"viewer"` → False；其他 admin → True；user → `created_by == actor.username` |
+| `can_write(actor)` | 寫入 gate 唯一真相：admin + `grade != "viewer"` → True；viewer → False。新增/匯入/編輯/刪除共用 |
+| `can_edit(record, actor)` | 記錄層編輯權限；admin 分支**委派 `can_write`**；user(latent) → `created_by == actor.username` |
 | `RecordNotFound` | 404 例外 |
 | `PermissionDenied` | 403 例外 |
 | `ValidationError` | 422 例外 |
@@ -584,14 +585,14 @@ if uploaded is not None:
 
 | 動作 | 允許者 | 前端呈現 |
 |---|---|---|
-| 讀取 | 所有登入者 | 一律可用 |
-| 建立 / 批量匯入 | 所有登入者 | 一律可用 |
-| 更新 / 刪除 | 該筆創建者、非 Viewer Admin | 無權限 → 按鈕 `disabled=True`（停用不隱藏） |
+| 讀取 | 所有登入者（三種 grade） | 一律可用 |
+| 建立 / 批量匯入 | `grade != "viewer"`（super_admin / editor） | viewer → 送出按鈕 `disabled`（唯讀） |
+| 更新 / 刪除 | `grade != "viewer"` | 無權限 → 按鈕 `disabled=True`（停用不隱藏） |
 
-- 權限判斷用純函式 `can_edit(record, actor)`：
-  - `actor.role == "admin"` 且 `actor.grade == "viewer"` → **False**（唯讀）
-  - `actor.role == "admin"` 其他 grade → **True**（可編輯任何記錄）
-  - `actor.role == "user"` → `record.created_by == actor.username`（只能編輯自己的）
+- 權限判斷用純函式 `can_edit(record, actor)`，其 admin 分支**委派 `can_write(actor)`**（`grade != "viewer"` 的唯一真相；系統管理頁共用 `can_write`）：
+  - `actor.role == "admin"` → `can_write(actor)`：`grade == "viewer"` → **False**（唯讀）；其他 grade → **True**（可編輯任何記錄）
+  - `actor.role == "user"` → `record.created_by == actor.username`（**latent 分支**：本部署無 user role，不會觸發）
+- 新增 / 匯入按鈕的 `disabled` 直接用 `can_write(actor)`（無 record 可傳）。
 - **後端 API 亦強制驗證**，前端控制僅為體驗。
 - `actor` 取自 `st.session_state["actor"]`：mock 由開發切換器提供，正式由認證（見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)）提供。
 

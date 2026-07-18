@@ -18,9 +18,11 @@
 class Actor:
     username: str
     role: Literal["user", "admin"]
+    grade: Optional[str] = None      # admin → super_admin/editor/viewer;存取軸
 ```
 
-- `resolve_actor()` 回傳 `Optional[Actor]`;下游(頁面、`can_edit`、`build_pages`)只認 `Actor`。
+- `resolve_actor()` 回傳 `Optional[Actor]`;下游(頁面、`can_edit`/`can_write`、`build_pages`)只認 `Actor`。
+- **本系統為 admin-only**:`role` 恆 `"admin"`,存取差異由 `grade` 決定(見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相));故 `resolve_actor` 必須把 introspection 回應的 `grade` 一併帶入 `Actor`,否則 `can_write` 判不到 viewer。
 
 ---
 
@@ -53,10 +55,10 @@ class Actor:
 
 ---
 
-## 4. bff:introspection 解析與 role 映射
+## 4. bff:introspection 解析與 role / grade 映射
 
-- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。
-- **落地**:`session_state["actor"] = Actor(user.name, map_role(role))`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。
+- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, grade, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。`grade` 對應後端 JWT grade claim(admin → `super_admin`/`editor`/`viewer`)。
+- **落地**:`session_state["actor"] = Actor(user.name, map_role(role), grade=grade)`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。**`grade` 必須帶入**,否則 `can_write` 判不到 viewer(存取 gate 失效)。
 - **role 映射** `map_role`:後端沿用前端 `Role` enum 數值;預設 `1 → "admin"`、其餘 → `"user"`。**確切數值待與前端 `lib/session/types` 對齊**(§7)。
 - **快取**:以 `st.cache_data`(TTL 30–60s、不超過 `expiresAt`)包住「cookie 原值 → introspection 結果」;401 / 登出 / refresh 後主動清快取(auth-flow §4.6)。
 

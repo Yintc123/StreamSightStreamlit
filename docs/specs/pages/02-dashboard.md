@@ -89,6 +89,21 @@ metric_cards([
 
 ---
 
+## `lib/dashboard.py` 純函式契約（單一真相）
+
+> 對齊 CLAUDE.md「邏輯進 `lib/`、頁面只排版」:儀表板的**指標組裝、趨勢 df、告警列**一律抽為純函式,**無 Streamlit 依賴**,於 unit 層完整覆蓋;頁面只負責取數（mock / API）與呼叫這些函式後 `metric_cards` / `st.line_chart` / `st.dataframe` 渲染。型別以 `from __future__ import annotations` 相容 3.9。
+
+| 函式 | 簽章 | 契約 |
+|---|---|---|
+| `count_today` | `(records: List[Record], today: date) -> int` | `created_at.date() == today` 的筆數;空 list → 0。 |
+| `recent_alerts` | `(records: List[Record], n: int = 5) -> List[Record]` | 依 `created_at` 由新到舊取前 `n` 筆;不足回全部;不變更輸入。 |
+| `trend_df` | `(records: List[Record]) -> pd.DataFrame` | index=`created_at`（DatetimeIndex,由舊到新）、單欄 `value`;空 list → 空 DataFrame（欄含 `value`）。沿用 `lib/analytics.py::records_to_df` 的風格。 |
+| `build_summary_metrics` | `(total_count: int, today_added: int, active_alerts: int, online_users: int) -> List[Metric]` | 回傳 4 個 `Metric`；**delta 規則為此函式唯一真相**：今日新增 → `delta=f"+{today_added}"`、`delta_color="normal"`；進行中告警 → `active_alerts > 0` 時 `delta_color="inverse"`，否則 `"off"`（`delta=None`）；總筆數 / 線上使用者 → 無 delta、`"off"`。 |
+
+> **delta 與 delta_color 的耦合**（同即時監控頁註）：`st.metric` 在 `delta=None` 時忽略 `delta_color`。進行中告警 `> 0` 時若要 inverse 生效需同時給 `delta`（如告警數本身）——`build_summary_metrics` 內處理，頁面不重寫規則。
+
+---
+
 ## Mock 模式行為(`DATA_SOURCE=mock`)
 
 - **指標卡**:使用 `MockDataSource.list_records()` 計算 `total_count`;`today_added` / `active_alerts` / `online_users` 以硬寫靜態假值(`today_added=3`、`active_alerts=1`、`online_users=2`)呈現,標示 `(mock)` caption。
@@ -133,7 +148,8 @@ metric_cards([
 
 | 模組 | 用途 |
 |---|---|
-| `lib/ui.py` | `metric_cards`、`empty_state` |
+| `lib/dashboard.py` | `count_today`、`recent_alerts`、`trend_df`、`build_summary_metrics`（本頁純邏輯,新增） |
+| `lib/ui.py` | `metric_cards`、`Metric`、`empty_state` |
 | `lib/errors.py` | `render_error` |
 | `lib/state.py` | `get_actor()` 取問候用戶名 |
 | `lib/data_source.py` | `get_data_source()` → mock 模式下取 MockDataSource |
@@ -145,21 +161,24 @@ metric_cards([
 
 純邏輯抽到 `lib/`(見 CLAUDE.md);頁面以 `AppTest` 驗互動行為。
 
-### 純函式(`tests/unit/`)
+### 純函式(`tests/unit/test_dashboard.py`)
 
-1. `Metric("進行中告警", 3, delta_color="inverse")` — `delta_color` 正確傳遞至 `metric_cards`(可直接測 `Metric` dataclass)。
-2. mock 模式下 `get_data_source()` 回 `MockDataSource`,能呼叫 `list_records()` 取假資料。
+1. `count_today(records, today)` — 只計 `created_at.date() == today`;空 list → 0。
+2. `recent_alerts(records, n=5)` — 由新到舊取前 5 筆;不足回全部;不變更輸入。
+3. `trend_df([])` → 空 DataFrame（欄含 `value`）;`trend_df(records)` → DatetimeIndex 由舊到新、單欄 `value`。
+4. `build_summary_metrics(...)` 回 4 個 `Metric`,值對應（總筆數 / 今日新增 / 進行中告警 / 線上使用者）。
+5. `active_alerts > 0` → 「進行中告警」`Metric.delta_color == "inverse"` 且 `delta` 非 `None`;`== 0` → `delta is None` 且 `delta_color == "off"`。
+6. 「今日新增」`Metric.delta == f"+{today_added}"` 且 `delta_color == "normal"`。
 
 ### 頁面行為(`tests/app/test_dashboard.py`，AppTest)
 
-3. 全 mock 下進入儀表板 → 頁面含「儀表板」標題。
-4. 全 mock 下 → 含 4 個 `st.metric` 元件(指標卡)。
-5. 全 mock 下 → 含問候語「歡迎」+使用者名(Alice)。
-6. mock 資料有 records → 顯示告警列表,**不**顯示 `empty_state`。
-7. `api_client` 回 `ApiError` → 頁面含 `st.error` 且含「錯誤代碼」。
-8. 告警數 > 0 的 `Metric.delta_color` 為 `"inverse"`(透過注入假指標值驗證)。
+7. 全 mock 下進入儀表板 → 頁面含「儀表板」標題。
+8. 全 mock 下 → 含 4 個 `st.metric` 元件(指標卡)。
+9. 全 mock 下 → 含問候語「歡迎」+使用者名(Alice)。
+10. mock 資料有 records → 顯示告警列表,**不**顯示 `empty_state`。
+11. `api_client` 回 `ApiError` → 頁面含 `st.error` 且含「錯誤代碼」。
 
-> 依 CLAUDE.md,逐一先寫失敗測試 → 最小實作 → 綠燈重構。
+> 依 CLAUDE.md,逐一先寫失敗測試 → 最小實作 → 綠燈重構。先做 `lib/dashboard.py`（unit 1–6），再做頁面（AppTest 7–11）。
 
 ---
 
