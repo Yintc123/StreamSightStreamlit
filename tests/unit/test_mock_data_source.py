@@ -14,9 +14,9 @@ from lib.models import (
 
 # --- 種子 + list_records 分頁(data-source §MockDataSource、§落地順序 2) ---
 
-def test_seed_has_40_records():
+def test_seed_has_200_records():
     page = MockDataSource().list_records(page=1, size=20)
-    assert page.total == 40
+    assert page.total == 200
     assert len(page.items) == 20
     assert page.page == 1
     assert page.size == 20
@@ -33,8 +33,8 @@ def test_pagination_slices_without_overlap():
 
 
 def test_seed_spans_all_categories():
-    # 40 筆平均分佈於四個分類,讓篩選看得出效果
-    items = MockDataSource().list_records(page=1, size=100).items
+    # 200 筆平均分佈於四個分類,讓篩選看得出效果
+    items = MockDataSource().list_records(page=1, size=200).items
     seen = {r.category for r in items}
     assert seen == set(CATEGORIES)
 
@@ -69,8 +69,8 @@ def _recs(*titles_categories):
 
 
 def test_filter_by_category_exact():
-    page = MockDataSource().list_records(page=1, size=100, category="感測器")
-    assert page.total == 10  # 40 平均分 4 類
+    page = MockDataSource().list_records(page=1, size=200, category="感測器")
+    assert page.total == 50  # 200 平均分 4 類
     assert all(r.category == "感測器" for r in page.items)
 
 
@@ -81,7 +81,7 @@ def test_filter_keyword_case_insensitive_substring():
 
 
 def test_empty_keyword_is_no_filter():
-    assert MockDataSource().list_records(keyword="", size=100).total == 40
+    assert MockDataSource().list_records(keyword="", size=200).total == 200
 
 
 # --- 排序(data-source §落地順序 4) ---
@@ -201,7 +201,7 @@ def test_delete_soft_deletes_and_hides_record():
     ds.delete_record(1, Actor("alice", "user"))
     with pytest.raises(RecordNotFound):
         ds.get_record(1)  # 軟刪後視為不存在
-    assert ds.list_records(size=100).total == 39
+    assert ds.list_records(size=200).total == 199
 
 
 def test_delete_without_permission_raises():

@@ -95,11 +95,11 @@ def test_category_filter_shows_only_matching_records():
 
 
 def test_category_filter_all_restores_full_page():
-    """切回「全部」，總筆數回到 40（種子資料）。"""
+    """切回「全部」，總筆數回到 200（種子資料）。"""
     at = _open_data_management(Actor("alice", "user"))
     _category_box(at).set_value("感測器").run()
     _category_box(at).set_value("全部").run()
-    assert _total_records(at) == 40
+    assert _total_records(at) == 200
 
 
 def test_filter_change_resets_page_to_1():

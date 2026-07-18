@@ -1,10 +1,11 @@
 """MockDataSource:記憶體假資料,實作 DataSource 介面。
 
-見規格 docs/specs/data-source.md。種子為 40 筆決定性(非亂數)Record,
-平均分佈四分類、跨 alice/bob/admin、跨時間,讓分頁 / 篩選 / 排序看得出效果。
+見規格 docs/specs/data-source.md。種子為 40 筆決定性 Record（固定 seed 隨機值），
+平均分佈四分類、跨 alice/bob/admin、跨時間,讓分頁 / 篩選 / 排序 / 圖表看得出效果。
 """
 from __future__ import annotations
 
+import random
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -25,23 +26,27 @@ from lib.models import (
 
 _BULK_MAX_ROWS = 1000
 
-# 固定基準日往回遞減,避免 datetime.now()(利於測試斷言)
+# 固定基準日，往回 90 天（≈3 個月）均勻分佈 200 筆，避免 datetime.now()
 _SEED_BASE = datetime(2026, 7, 18, 0, 0, 0, tzinfo=timezone.utc)
 _SEED_USERS = ["alice", "bob", "admin"]
+_SEED_COUNT = 200
+_SPAN_DAYS = 90
+_STEP_MINUTES = (_SPAN_DAYS * 24 * 60) // (_SEED_COUNT - 1)  # ≈ 651 min/筆
 
 
 def make_seed_records() -> List[Record]:
-    """產生 40 筆決定性種子。"""
+    """產生 200 筆決定性種子（固定 seed 隨機值 10–999，時間跨度 90 天）。"""
+    rng = random.Random(2026)
     records: List[Record] = []
-    for i in range(40):
+    for i in range(_SEED_COUNT):
         category = CATEGORIES[i % len(CATEGORIES)]
         created_by = _SEED_USERS[i % len(_SEED_USERS)]
-        created = _SEED_BASE - timedelta(hours=i)
+        created = _SEED_BASE - timedelta(minutes=i * _STEP_MINUTES)
         records.append(
             Record(
                 id=i + 1,
-                title=f"{category}-{i + 1:02d}",
-                value=float(i),
+                title=f"{category}-{i + 1:03d}",
+                value=round(rng.uniform(10.0, 999.0), 1),
                 category=category,
                 created_by=created_by,
                 created_at=created,
