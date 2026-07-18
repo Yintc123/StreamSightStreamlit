@@ -27,7 +27,7 @@ def _set_cookies(monkeypatch, cookies: dict):
     monkeypatch.setattr(st, "context", SimpleNamespace(cookies=cookies))
 
 
-_INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "accessToken": "jwt", "expiresAt": 123}
+_INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "accessToken": "jwt", "expiresAt": 123, "csrfToken": "csrf-tok"}
 
 
 # --- resolve_actor mock 分支(auth §8 測 1–2;APP_ENV 預設 local → AUTH_MODE=mock) ---
@@ -83,6 +83,14 @@ def test_resolve_actor_bff_success_sets_actor_and_token(bff_mode, fake_session, 
     assert actor == Actor("alice", "admin")
     assert fake_session["access_token"] == "jwt"
     assert fake_session["token_expires_at"] == 123
+
+
+def test_resolve_actor_bff_stores_csrf_token(bff_mode, fake_session, monkeypatch):
+    """S4: resolve_actor() bff 200 → session_state["csrf_token"] == "csrf-tok"。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    monkeypatch.setattr(auth, "_introspect", lambda: _INTROSPECT_OK)
+    auth.resolve_actor()
+    assert fake_session["csrf_token"] == "csrf-tok"
 
 
 def test_resolve_actor_bff_401_returns_none_and_clears(bff_mode, fake_session, monkeypatch):
@@ -179,10 +187,10 @@ def test_logout_bff_clears_state_even_on_network_error(bff_mode, fake_session, m
     assert "actor" not in fake_session
 
 
-def test_do_logout_bff_fetches_csrf_then_posts(bff_mode, fake_session, monkeypatch):
-    """_do_logout_bff:帶 _fetch_csrf 回傳的 CSRF token 和 cookie POST 到 logout 端點。"""
+def test_do_logout_bff_uses_state_csrf_and_sends_origin(bff_mode, fake_session, monkeypatch):
+    """S5: _do_logout_bff 從 state.get_csrf() 取 CSRF token，帶 Origin + X-CSRF-Token POST 到 logout 端點。"""
     _set_cookies(monkeypatch, {"streamsight_session": "rawcookie"})
-    monkeypatch.setattr(auth, "_fetch_csrf", lambda: "csrf-tok")
+    fake_session["csrf_token"] = "csrf-tok"
     captured = []
 
     def router(req):
@@ -191,7 +199,7 @@ def test_do_logout_bff_fetches_csrf_then_posts(bff_mode, fake_session, monkeypat
         )
         return httpx.Response(204)
 
-    _orig_client = httpx.Client  # 先捕捉原始 Client,避免 patch lambda 遞迴呼叫自身
+    _orig_client = httpx.Client
     monkeypatch.setattr(
         httpx, "Client", lambda **kw: _orig_client(transport=httpx.MockTransport(router))
     )
@@ -201,23 +209,13 @@ def test_do_logout_bff_fetches_csrf_then_posts(bff_mode, fake_session, monkeypat
     assert r["method"] == "POST"
     assert r["path"] == "/api/auth/logout"
     assert r["headers"].get("x-csrf-token") == "csrf-tok"
+    assert r["headers"].get("origin") == "http://localhost:8501"
     assert "rawcookie" in (r["headers"].get("cookie") or "")
 
 
-def test_fetch_csrf_calls_bff_endpoint_and_returns_token(bff_mode, fake_session, monkeypatch):
-    """_fetch_csrf:GET /api/csrf(帶 cookie)→ 回傳 csrfToken 字串。"""
+def test_do_logout_bff_raises_when_csrf_missing(bff_mode, fake_session, monkeypatch):
+    """S5c: state.get_csrf() 為 None → 拋 RuntimeError（防止 resolve_actor 未先呼叫）。"""
     _set_cookies(monkeypatch, {"streamsight_session": "rawcookie"})
-    captured = []
-
-    def router(req):
-        captured.append({"path": req.url.path, "headers": dict(req.headers)})
-        return httpx.Response(200, json={"csrfToken": "tok-abc"})
-
-    _orig_client = httpx.Client
-    monkeypatch.setattr(
-        httpx, "Client", lambda **kw: _orig_client(transport=httpx.MockTransport(router))
-    )
-    token = auth._fetch_csrf()
-    assert token == "tok-abc"
-    assert captured[0]["path"] == "/api/csrf"
-    assert "rawcookie" in (captured[0]["headers"].get("cookie") or "")
+    # csrf_token 不存在於 fake_session
+    with pytest.raises(RuntimeError):
+        auth._do_logout_bff()

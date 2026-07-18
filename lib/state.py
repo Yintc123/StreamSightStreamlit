@@ -14,6 +14,7 @@ from lib.models import Actor
 _ACTOR = "actor"
 _ACCESS_TOKEN = "access_token"
 _TOKEN_EXPIRES_AT = "token_expires_at"
+_CSRF_TOKEN = "csrf_token"
 _LAST_REQUEST_ID = "last_request_id"
 
 
@@ -34,11 +35,19 @@ def set_token(token: str, expires_at: int) -> None:
     st.session_state[_TOKEN_EXPIRES_AT] = expires_at
 
 
+def get_csrf() -> Optional[str]:
+    return st.session_state.get(_CSRF_TOKEN)
+
+
+def set_csrf(token: str) -> None:
+    st.session_state[_CSRF_TOKEN] = token
+
+
 def set_last_request_id(rid: Optional[str]) -> None:
     st.session_state[_LAST_REQUEST_ID] = rid
 
 
 def clear_auth() -> None:
-    """登出 / 401:清 actor / token。(introspection 快取清除於 bff cycle 補上。)"""
-    for key in (_ACTOR, _ACCESS_TOKEN, _TOKEN_EXPIRES_AT):
+    """登出 / 401:清 actor / token / csrf_token。"""
+    for key in (_ACTOR, _ACCESS_TOKEN, _TOKEN_EXPIRES_AT, _CSRF_TOKEN):
         st.session_state.pop(key, None)

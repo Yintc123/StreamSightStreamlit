@@ -1,86 +1,123 @@
-# 頁面規格:即時監控
+# 頁面規格：即時監控（DB 資源使用狀況）
 
-- 頁面編號:4
-- 對應模組:模組 3 即時監控
-- 存取權限:已登入使用者
-- 架構:方案 B(Streamlit + FastAPI WebSocket),見 [ADR 0001](../../decisions/0001-realtime-architecture.md)
+- 頁面編號：4
+- 對應檔案：`pages/realtime_monitor.py`
+- 存取權限：已登入 admin
+- 資料來源：FastAPI `GET /admin/monitoring/infra`（見 [infra-monitoring.md](../../../../StreamSightBackend/docs/specs/infra-monitoring.md)）
+
+---
 
 ## 目的
 
-即時呈現由 FastAPI 生成並推送的資料,更新圖表並在數值超過閾值時告警。
+即時呈現 DB 主機的硬體資源使用狀況（CPU / 記憶體 / 磁碟 / IOPS / 連線數），以折線圖顯示最近 5 分鐘的歷史趨勢，每 5 秒自動刷新。
 
-## 版面
-
-以 `st.tabs` 分為兩個分頁:即時圖表 / 告警。
+---
 
 ## UI 版面規劃
 
-寬版,頂部連線狀態橫幅,`st.tabs(["即時圖表", "告警"])`。閾值控制放側邊欄。
+寬版，由上而下：即時指標列 → 折線圖群。
 
 ```
-● 已連線 /ws/live   最後更新 12:00:03                   ← 狀態橫幅(綠/紅)
-
-[側邊欄]              [ 即時圖表 ] [ 告警 ]              ← st.tabs
- 閾值設定             ── 即時圖表 ──────────────────────────
- 上限 [====|==] 90    ┌─────────────────────┐┌──────────┐
- 下限 [==|====] 10    │  折線圖(數值×時間)   ││ 柱狀圖    │  ← st.columns([2,1])
- [Admin]全域預設      │  滑動視窗最近 N 點    ││ 各分類    │     st.line_chart /
- [ 套用 ]            └─────────────────────┘└──────────┘     st.bar_chart
-
-                     ── 告警 ──────────────────────────────
-                     🔔 toast + 列表:時間 分類 數值 閾值 狀態
+┌──────────────────────────────────────────────────────────────┐
+│ DB 即時監控                        最後更新 12:00:03          │ ← st.title + 右側 caption
+├──────────┬──────────┬──────────┬──────────┬─────────────────┤
+│ CPU 使用率│ 記憶體   │ 磁碟使用率│ 連線數    │ Buffer Pool 命中 │ ← st.columns(5) + st.metric
+│  23.4 %  │  61.2 % │  45.8 % │   5      │  98.7 %         │
+├──────────┴──────────┴──────────┴──────────┴─────────────────┤
+│ CPU 使用率（近 5 分鐘）                                        │ ← st.line_chart
+│ ▁▂▃▄▃▂▁▂▃▄▅▄▃▂▃▄                                            │
+├──────────────────────────────────────────────────────────────┤
+│ 記憶體 / 磁碟使用率（近 5 分鐘）                               │ ← st.line_chart（雙線）
+│ ▃▃▄▄▃▃▄▄▄▃▃▄▄▄▄▄  ← 記憶體                                  │
+│ ▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅  ← 磁碟                                    │
+├──────────────────────────────────────────────────────────────┤
+│ 磁碟 IOPS / 連線數（近 5 分鐘）                                │ ← st.columns(2) + st.line_chart
+│ ┌──────────────────┐  ┌───────────────────┐                 │
+│ │ 讀寫 IOPS（雙線） │  │ DB 連線數          │                 │
+│ └──────────────────┘  └───────────────────┘                 │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 | 區域 | 元件 | 備註 |
 |---|---|---|
-| 連線狀態 | `st.status` / 帶色 `st.caption` | 綠=已連線,紅=重連中 |
-| 即時圖表 | `st.columns([2,1])` + line/bar chart | 由 WebSocket 元件或 `fragment(run_every)` 更新 |
-| 閾值控制 | `st.sidebar` + `st.slider`/`number_input` | 變更即時生效;Admin 才顯示全域預設 |
-| 告警觸發 | `st.toast` + 圖上標記 + 列表 | 超閾值列以 warning/danger 色 |
-| 斷線 | `st.warning` 重連中 | 自動重連 |
+| 即時指標列 | `st.columns(5)` + `st.metric` | 顯示最新一筆快照的各指標值 |
+| CPU 折線圖 | `st.line_chart(df[["cpu_percent"]])` | 單線，x 軸為時間戳 |
+| 記憶體/磁碟折線圖 | `st.line_chart(df[["memory_percent","disk_percent"]])` | 雙線同圖 |
+| IOPS 折線圖 | `st.line_chart(df[["disk_read_iops","disk_write_iops"]])` | 雙線同圖 |
+| 連線數折線圖 | `st.line_chart(df[["db_connections"]])` | 單線 |
+| 最後更新時間 | `st.caption` | 顯示最新一筆 `ts` 轉換後的本地時間 |
 
-> 真正 WebSocket 由 FastAPI 提供(方案 B);Streamlit 端以可連 WS 的前端元件或定時刷新呈現,取捨見 [功能能力對照](../feature-capability.md)。
+---
 
 ## 功能細節
 
-### 即時圖表
-- 透過 WebSocket 長連線(FastAPI `/ws/live`)接收每秒資料。
-- 折線圖:數值隨時間變化。
-- 柱狀圖:各分類即時分佈。
-- 保留最近 N 點的滑動視窗,避免無限增長。
+### 自動刷新
 
-### 告警
-- 閾值設定:上限 / 下限(可由使用者調整,Admin 可設全域預設)。
-- 閾值變更透過 API 送後端;超閾值判斷與告警寫入由後端負責,前端顯示圖上標記 + `st.toast`/`st.warning`。
-- 告警列表:時間、分類、數值、觸發閾值、狀態。
+```python
+time.sleep(5)
+st.rerun()
+```
 
-## 即時資料流
+每 5 秒重跑整個頁面，重新呼叫 API 並更新圖表。不使用第三方 auto-refresh 元件，無額外依賴。
 
-1. FastAPI 生成器每秒產生資料 → 寫入 DB。
-2. 透過 `/ws/live` 主動推送(含告警判斷結果)。
-3. 前端 WebSocket 元件收到後更新圖表 / 觸發告警。
+### 資料取得
 
-> Streamlit 無原生伺服器推送;真正的 WebSocket 由 FastAPI 提供。前端需可連 WebSocket 的元件在 Streamlit 中呈現。
+```python
+data = api_client.request("GET", "/admin/monitoring/infra")
+snapshots = data["snapshots"]  # list of InfraSnapshot，由新到舊
+```
+
+轉成 pandas DataFrame，index 為 `ts`（epoch ms 轉 datetime），欄位為各指標。資料為空時顯示 `st.info` 空狀態。
+
+### 折線圖
+
+```python
+import pandas as pd
+
+df = pd.DataFrame(snapshots)
+df["ts"] = pd.to_datetime(df["ts"], unit="ms")
+df = df.set_index("ts").sort_index()  # 由舊到新，折線圖由左到右
+
+st.line_chart(df[["cpu_percent"]])
+st.line_chart(df[["memory_percent", "disk_percent"]])
+# ...
+```
+
+- 最多 60 筆（5 分鐘）
+- 欄位含 `null` 時（如第一筆 CPU）pandas 自動跳過，折線不斷
+
+### 即時指標列
+
+取最新一筆（`snapshots[0]`）的各欄位顯示於 `st.metric`：
+- `cpu_percent` 為 `null` 時顯示 `—`
+- `db_buffer_pool_hit_rate` < 95% 時以 `delta_color="inverse"` 標示
+
+---
 
 ## 資料
 
-- 即時資料與告警由**後端**擁有並落地(records / realtime、alerts 表);前端經 WebSocket 接收即時串流、經 REST API 讀取告警列表與變更閾值,不直接連 DB。
-- alerts 表:`id, category, value, threshold, triggered_at, status`。
+- 唯讀頁面，不做寫入。
+- 資料由 FastAPI `InfraSampler` background task 每 5 秒採集，存 Redis List，保留 60 筆（≈ 5 分鐘）。
+- 前端不直接連 Redis 或 exporter，只透過 `ApiClient` 呼叫 FastAPI REST endpoint。
+
+---
 
 ## 狀態與錯誤處理
 
-呈現一律依 [錯誤處理規格 §3](../error-handling.md#3-呈現契約本規格唯一權威),不自訂層級 / 文案:
+依 [錯誤處理規格 §3](../error-handling.md#3-呈現契約本規格唯一權威)：
 
-| 情境 | 依 §3 呈現 |
+| 情境 | 呈現 |
 |---|---|
-| WebSocket 斷線(重連中) | `st.warning`「連線中斷,重連中…」於狀態橫幅;自動重連,不阻斷既有畫面 |
-| WebSocket 重連失敗(超過上限) | `st.error`「即時連線失敗,請重新整理頁面。」+ **停止自動刷新** + 手動重連;重連上限值見 [§待確認](../error-handling.md#8-相依--待確認) |
-| REST 呼叫失敗 / 逾時(閾值變更、告警列表) | `ApiError` → `st.error` + 保留頁框 + 可重試(附錯誤代碼) |
-| 無資料 | `st.info` 空狀態,取代圖表 / 告警列表區 |
+| API 呼叫失敗 / 逾時 | `ApiError` → `st.error` + 保留頁面框架 + 停止自動刷新 |
+| FastAPI 回 503（Redis 不可用） | `st.error`「監控服務暫時無法使用」 |
+| 資料為空（sampler 剛啟動） | `st.info`「資料採集中，請稍候…」取代圖表 |
+| `cpu_percent = null`（第一筆） | 指標列顯示 `—`；折線圖自動跳過該點 |
 
-> 閾值變更、告警列表為 REST 呼叫,錯誤映射與呈現與其他頁面一致(見 [api-client §3.2](../api-client.md));WebSocket 連線錯誤屬前端元件層,依上表於狀態橫幅呈現。
+---
 
-## 依賴 / 備註
+## 依賴
 
-- 需要 FastAPI 服務同時運行(見技術架構方案 B)。
-- 閾值變更需即時生效。
+- FastAPI `GET /admin/monitoring/infra` 需上線（見 [infra-monitoring.md](../../../../StreamSightBackend/docs/specs/infra-monitoring.md)）。
+- `node-exporter`（`:9100`）與 `mysqld-exporter`（`:9104`）需在 infra compose 中運行。
+- `prometheus-client` 套件需加入 FastAPI 的依賴（用於 Prometheus text format 解析）。
+- Streamlit 端無新增依賴（pandas 已存在）。

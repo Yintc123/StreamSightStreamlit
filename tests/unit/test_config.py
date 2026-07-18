@@ -141,7 +141,6 @@ def test_bff_auth_setting_defaults():
     s = get_settings()
     assert s.bff_session_path == "/api/auth/session"
     assert s.bff_logout_path == "/api/auth/logout"
-    assert s.bff_csrf_path == "/api/csrf"
     assert s.role_admin_value == 1
 
 
@@ -149,3 +148,17 @@ def test_bff_login_path_default():
     """bff_login_path 預設 /login，供 actor is None 時跳轉 Next.js 登入頁。"""
     s = get_settings()
     assert s.bff_login_path == "/login"
+
+
+# --- streamlit_origin / bff_csrf_path(config §3.3;015 §7.1B) ---
+
+def test_streamlit_origin_default():
+    """streamlit_origin 預設 http://localhost:8501，供 logout Origin header 使用(S6)。"""
+    s = get_settings()
+    assert s.streamlit_origin == "http://localhost:8501"
+
+
+def test_bff_csrf_path_removed():
+    """bff_csrf_path 已移除；csrfToken 改由 introspection 一併回傳(S7)。"""
+    s = get_settings()
+    assert not hasattr(s, "bff_csrf_path")

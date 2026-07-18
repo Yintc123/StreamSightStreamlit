@@ -48,6 +48,18 @@ def test_set_last_request_id(fake_session):
     assert fake_session["last_request_id"] == "st-abc"
 
 
+# --- csrf_token (S1-S3) ---
+
+def test_get_csrf_none_when_unset(fake_session):
+    assert state.get_csrf() is None
+
+
+def test_set_and_get_csrf(fake_session):
+    state.set_csrf("tok")
+    assert state.get_csrf() == "tok"
+    assert fake_session["csrf_token"] == "tok"
+
+
 # --- clear_auth ---
 
 def test_clear_auth_removes_actor_and_token(fake_session):
@@ -56,3 +68,10 @@ def test_clear_auth_removes_actor_and_token(fake_session):
     state.clear_auth()
     assert state.get_actor() is None
     assert state.get_token() is None
+
+
+def test_clear_auth_removes_csrf_token(fake_session):
+    state.set_csrf("tok")
+    state.clear_auth()
+    assert state.get_csrf() is None
+    assert "csrf_token" not in fake_session

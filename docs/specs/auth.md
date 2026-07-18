@@ -55,8 +55,8 @@ class Actor:
 
 ## 4. bff:introspection 解析與 role 映射
 
-- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, accessToken, expiresAt }`(auth-flow §3.1)。
-- **落地**:`session_state["actor"] = Actor(user.name, map_role(role))`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`。
+- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。
+- **落地**:`session_state["actor"] = Actor(user.name, map_role(role))`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。
 - **role 映射** `map_role`:後端沿用前端 `Role` enum 數值;預設 `1 → "admin"`、其餘 → `"user"`。**確切數值待與前端 `lib/session/types` 對齊**(§7)。
 - **快取**:以 `st.cache_data`(TTL 30–60s、不超過 `expiresAt`)包住「cookie 原值 → introspection 結果」;401 / 登出 / refresh 後主動清快取(auth-flow §4.6)。
 
@@ -79,16 +79,17 @@ class Actor:
 | `actor` | `resolve_actor` 成功 / 開發切換器 | 全部 |
 | `access_token` | introspection / `refresh_token` | bff |
 | `token_expires_at` | introspection / `refresh_token` | bff |
+| `csrf_token` | introspection(`resolve_actor` 成功) | bff |
 
-- 登出 / 401 → 清上述 key 與 introspection 快取。
-- token **只存記憶體**,不寫檔、不落 log(auth-flow §7.2)。
+- 登出 / 401 → 清上述全部 key 與 introspection 快取。
+- token / csrfToken **只存記憶體**,不寫檔、不落 log(auth-flow §7.2)。
 
 ---
 
 ## 7. 相依 / 待確認
 
 - [ ] **role 數值對應**:`map_role` 的確切整數值需對齊前端 `Role` enum(`ADMIN`/`USER`);目前預設 `1→admin`。
-- [ ] **登出 CSRF**:`logout()` 的 CSRF token 取得方式(introspection 一併回傳 vs 另打 `/api/csrf`)——見 auth-flow §9。
+- [x] **登出 CSRF**:已定案(2026-07-18)。csrfToken 由 introspection 一併回傳(`resolve_actor` 落 `state.set_csrf`)，`_do_logout_bff()` 從 `state.get_csrf()` 取用；不需額外打 `/api/csrf`（見 015 §7.1A）。
 - [ ] **cookie 名稱**:`raw_cookie()` 讀的 cookie 名(如 `streamsight_session`)需與前端一致,放 `lib/config.py`。
 - [x] **型別統一**:全專案身分型別為 `Actor`,`Identity` 廢除(§1)。
 - [x] **auth 接縫**:`get_access_token`/`refresh_token`/`raw_cookie` 契約定於本檔,api_client 只消費。

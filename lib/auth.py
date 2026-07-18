@@ -44,6 +44,7 @@ def resolve_actor() -> Optional[Actor]:
     actor = Actor(data["user"]["name"], map_role(data["role"]))
     state.set_actor(actor)
     state.set_token(data["accessToken"], data["expiresAt"])
+    state.set_csrf(data["csrfToken"])
     return actor
 
 
@@ -92,26 +93,17 @@ def logout() -> None:
 
 
 def _do_logout_bff() -> None:
-    """POST {BFF}/api/auth/logout(帶 cookie + X-CSRF-Token);auth-flow §4.5、§7.3。"""
-    csrf = _fetch_csrf()
+    """POST {BFF}/api/auth/logout(帶 cookie + X-CSRF-Token + Origin);auth-flow §4.5、§7.3、015 §7.1B。"""
+    csrf = state.get_csrf()
+    if csrf is None:
+        raise RuntimeError("no csrf token in session_state; call resolve_actor() first")
     settings = get_settings()
     _make_bff_client().request(
         "POST",
         f"{settings.bff_base_url}{settings.bff_logout_path}",
         auth="cookie",
-        extra_headers={"X-CSRF-Token": csrf},
+        extra_headers={"X-CSRF-Token": csrf, "Origin": settings.streamlit_origin},
     )
-
-
-def _fetch_csrf() -> str:
-    """GET {BFF}/api/csrf(帶 cookie)→ 回傳 csrfToken 字串;供 _do_logout_bff 使用(auth-flow §7.3)。
-    CSRF token 取得方式(introspection 一併 vs /api/csrf)為 TBD(auth-flow §9);此處採後者。
-    """
-    settings = get_settings()
-    body = _make_bff_client().request(
-        "GET", f"{settings.bff_base_url}{settings.bff_csrf_path}", auth="cookie"
-    )
-    return body["csrfToken"]
 
 
 def _introspect() -> dict:
