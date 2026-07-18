@@ -3,8 +3,24 @@
 
 /* 內容區:縮上邊距、限制寬度 */
 .block-container {
-    padding-top: 2rem;
+    padding-top: 0.5rem;
     max-width: 1100px;
+}
+
+/* 元素容器上下 padding 減半（Streamlit 預設 0.5rem → 0.25rem） */
+.stElementContainer {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+/* 分隔線移除上下 padding 與 margin */
+.stElementContainer:has(hr) {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.stElementContainer:has(hr) hr {
+    margin: 0;
 }
 
 /* 主要按鈕圓角 */
