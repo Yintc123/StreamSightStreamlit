@@ -171,7 +171,7 @@ records 由**來源端**擁有(mock 記憶體 / 日後後端 API),前端經 `Dat
 | 建立/更新/刪除成功 | `st.toast` / `st.success` + 刷新 |
 | 來源失敗 / 逾時 | `st.error`,保留頁面框架,可重試(mock 階段不會發生) |
 | 無權限操作 | 按鈕停用 + 提示;來源拋 `PermissionDenied`(對應 403)亦以 `st.error` 呈現 |
-| 找不到資料 | `RecordNotFound`(對應 404)→ `st.error` 並刷新列表 |
+| 找不到資料 | `RecordNotFound`(對應 404)→ `st.warning`「資料不存在或已被移除」並刷新列表（依 [error-handling §3](../error-handling.md#3-呈現契約本規格唯一權威)，404 為 `warning` 非 `error`） |
 | 建立/更新欄位不合法 | `ValidationError`(對應 422)→ 表單旁 `st.error` |
 | 匯入格式錯誤 | 標示問題列,不中斷其餘 |
 
