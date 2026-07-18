@@ -31,7 +31,7 @@
  時間序列折線圖 + 分類疊圖   ← st.line_chart / Plotly
 
 ── 匯出 ────────────────────────────────────────────────
- 目前篩選:{摘要}
+ 目前篩選：分類={category}[，期間 {from} ~ {to}]，共 {n} 筆   ← build_export_caption()
  [ ⬇ 下載 Excel (.xlsx) ]   [ ⬇ 下載 CSV ]   ← st.download_button
 ```
 
@@ -103,32 +103,35 @@ st.line_chart(pivot)
 ### 匯出分頁
 
 ```python
-import io, pandas as pd
+from lib.analytics import build_export_caption, make_excel_bytes
 
 has_data = not df.empty
 
-# Excel
-buf = io.BytesIO()
-with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-    df.to_excel(writer, index=False)
-buf.seek(0)
+if has_data:
+    st.caption(build_export_caption(fp.category, fp.date_from, fp.date_to, len(df)))
+    export_df = df.reset_index()
+    excel_bytes = make_excel_bytes(export_df)          # 自動處理 tz-aware datetime
+    csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")  # utf-8-sig 讓 Excel 正確開啟
+else:
+    empty_state()
+    excel_bytes, csv_bytes = b"", b""
 
 st.download_button("⬇ 下載 Excel (.xlsx)",
-                   data=buf, file_name="analysis.xlsx",
+                   data=excel_bytes, file_name="analysis.xlsx",
                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                    disabled=not has_data)
-
-# CSV
-csv = df.to_csv(index=False).encode("utf-8-sig")   # utf-8-sig 讓 Excel 正確開啟
 st.download_button("⬇ 下載 CSV",
-                   data=csv, file_name="analysis.csv",
+                   data=csv_bytes, file_name="analysis.csv",
                    mime="text/csv",
                    disabled=not has_data)
 ```
 
-- **無資料時 `disabled=True`**,防止下載空檔案。
-- `openpyxl` 需加入 `requirements.txt`。
-- 內容與目前篩選條件一致,不另呼叫 API(以 `df` 為準)。
+- **篩選摘要**：`build_export_caption(category, date_from, date_to, count)` 回傳格式：
+  `目前篩選：分類={category}[，期間 {from} ~ {to}]，共 {n} 筆`；無設定的日期端以「—」表示。
+- **無資料時 `disabled=True`**，防止下載空檔案。
+- `make_excel_bytes` 自動將 tz-aware datetime 轉為 UTC naive（Excel 不支援時區）。
+- `openpyxl` 需在 `requirements.txt` 中。
+- 內容與目前篩選條件一致，不另呼叫 API（以 `df` 為準）。
 
 ---
 
@@ -181,6 +184,7 @@ st.download_button("⬇ 下載 CSV",
 
 | 模組 | 用途 |
 |---|---|
+| `lib/analytics.py` | `records_to_df`、`agg_stats`、`agg_by_category`、`resample_series`、`filter_by_date`、`make_excel_bytes`、`build_export_caption` |
 | `lib/ui.py` | `filter_bar`、`metric_cards`、`empty_state` |
 | `lib/errors.py` | `render_error` |
 | `lib/data_source.py` | `get_data_source()` |
@@ -188,7 +192,7 @@ st.download_button("⬇ 下載 CSV",
 
 外部套件:
 - `pandas`（已存在）
-- `openpyxl`（需加入 `requirements.txt`，Excel 匯出用）
+- `openpyxl`（已加入 `requirements.txt`，Excel 匯出用）
 
 ---
 
@@ -204,6 +208,7 @@ st.download_button("⬇ 下載 CSV",
 4. `filter_by_date(df, date_from, date_to)` — 時間範圍正確過濾。
 5. `filter_by_category(df, "感測器")` — 分類正確過濾；`"全部"` → 不過濾。
 6. `make_excel_bytes(df)` — 回傳非空 bytes；`df.empty` 時也不拋例外。
+7. `build_export_caption(category, date_from, date_to, count)` — 格式驗證：無日期時不含「期間」；有單邊日期時另一端以「—」表示；完整日期與分類、筆數均出現在輸出字串中。
 
 ### 頁面行為（`tests/app/test_analytics.py`，AppTest）
 
