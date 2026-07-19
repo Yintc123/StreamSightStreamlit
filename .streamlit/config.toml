@@ -1,3 +1,12 @@
+# 伺服器設定
+# 修正 Windows 11 + Docker Desktop 下檔案上傳失敗:
+#   "Cannot request file URLs ... isServerConnected:true, isSessionInfoSet:false"
+# 成因:WebSocket 握手成功但初始 NewSession 訊框在 Docker Desktop 網路轉發下
+#       被截斷,前端收不到 SessionInfo,檔案上傳元件拿不到 session。
+# 註:非 CORS/XSRF 問題——頁面與 /_stcore/* 端點同源(皆 localhost:8501)。
+[server]
+enableWebsocketCompression = false
+
 # 主題設定(見 docs/specs/design-system.md 設計 Token)
 [theme]
 # 鎖定白天模式：未設 base 時 Streamlit 會跟隨瀏覽器 prefers-color-scheme 變暗

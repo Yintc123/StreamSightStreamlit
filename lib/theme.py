@@ -22,6 +22,37 @@ _THEME_JS = r"""
 })();
 """
 
+# Streamlit 把使用者在 ☰ → Settings → Appearance 選的主題存在 localStorage
+# （key 前綴 stActiveTheme-<basePath>-vN），且會「優先於 config.toml」。深色系統
+# 偏好或曾切過 dark，都會蓋掉 base="light" 讓整站變黑。以下 JS 清掉任何非 Light
+# 的儲存選擇，讓 Streamlit 落回 config（白天）；sessionStorage 旗標確保一個分頁
+# 生命週期內只重載一次，避免無限重載。
+_FORCE_LIGHT_JS = r"""
+(function () {
+  var win = window.parent;
+  try {
+    var GUARD = 'ss-force-light';
+    if (win.sessionStorage.getItem(GUARD)) return;
+    win.sessionStorage.setItem(GUARD, '1');
+    var cleared = false;
+    Object.keys(win.localStorage).forEach(function (k) {
+      if (k.indexOf('stActiveTheme') !== 0) return;
+      var v = win.localStorage.getItem(k) || '';
+      if (v.indexOf('"Light"') === -1) {   // 儲存的不是內建 Light → 清掉落回 config
+        win.localStorage.removeItem(k);
+        cleared = true;
+      }
+    });
+    if (cleared) win.location.reload();
+  } catch (e) {}
+})();
+"""
+
+
+def build_force_light_js() -> str:
+    """回傳強制白天模式的 client-side JS（清除 Streamlit 記住的深色 Appearance）。"""
+    return _FORCE_LIGHT_JS
+
 
 def load_css(path: str = "styles/main.css") -> None:
     """讀取外部 CSS 並以 <style> 注入;每次 rerun 重注入無副作用。"""
@@ -49,4 +80,6 @@ def init_theme_state() -> None:
 def inject_theme_js() -> None:
     """每次 rerun 注入冪等 ThemeToggle JS（純 client-side 切換，不觸發 Python rerun）。"""
     import streamlit.components.v1 as components
-    components.html(f"<script>{_THEME_JS}</script>", height=0)
+    components.html(
+        f"<script>{_FORCE_LIGHT_JS}{_THEME_JS}</script>", height=0
+    )

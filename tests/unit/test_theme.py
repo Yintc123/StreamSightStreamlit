@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from lib import theme
-from lib.theme import build_theme_cookie_string, parse_theme
+from lib.theme import build_force_light_js, build_theme_cookie_string, parse_theme
 
 
 def test_load_css_injects_style_tag(monkeypatch, tmp_path):
@@ -103,3 +103,32 @@ def test_config_toml_forces_light_base():
         encoding="utf-8"
     )
     assert 'base = "light"' in config
+
+
+# ── 強制白天模式（清除瀏覽器記住的 Appearance 覆寫）──────────────────────────
+#
+# config.toml 的 base="light" 只是「乾淨瀏覽器」的預設；Streamlit 允許使用者
+# 在 ☰ → Settings → Appearance 改主題，選擇存於 localStorage（key 前綴
+# stActiveTheme），且會「優先於 config」。深色系統偏好或使用者曾切過 dark，
+# 就會蓋掉 light 造成整站變黑（頂列因寫死白色而不受影響 → 上白下黑）。
+# 本 JS 在 client 端清掉非 Light 的儲存選擇並重載一次，把主題鎖回白天。
+
+
+def test_force_light_js_targets_streamlit_theme_storage():
+    """鎖定 Streamlit 存放主題選擇的 localStorage key（前綴 stActiveTheme）。"""
+    assert "stActiveTheme" in build_force_light_js()
+
+
+def test_force_light_js_clears_non_light_choice():
+    """需清除（removeItem）已儲存的非 Light 主題，讓 Streamlit 落回 config。"""
+    assert "removeItem" in build_force_light_js()
+
+
+def test_force_light_js_reloads_to_apply():
+    """清除後需重載一次，讓 Streamlit 以 config（light）重新渲染。"""
+    assert "reload" in build_force_light_js()
+
+
+def test_force_light_js_guards_against_reload_loop():
+    """以 sessionStorage 旗標防止無限重載。"""
+    assert "sessionStorage" in build_force_light_js()
