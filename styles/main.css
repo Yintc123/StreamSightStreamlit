@@ -699,8 +699,23 @@ html[data-theme="dark"] [data-testid="stFileUploaderDropzone"] {
     color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
 }
 
-/* tabs：active 色由 primaryColor（light 藍）改 brand（cyan） */
-html[data-theme="dark"] [data-testid="stTabs"] button[aria-selected="true"] {
+/* tabs：文字包在內層 p，需明列（同 label 陷阱）。
+ * 未選取 ink-AA → hover ink-AAA → 選取 brand（cyan）；
+ * active 規則排後、特異度同級 (0,3,2)/(0,3,3)，後宣告勝出 */
+html[data-theme="dark"] [data-testid="stTabs"] button[data-baseweb="tab"],
+html[data-theme="dark"] [data-testid="stTabs"] button[data-baseweb="tab"] p {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] [data-testid="stTabs"] button[data-baseweb="tab"]:hover,
+html[data-theme="dark"] [data-testid="stTabs"] button[data-baseweb="tab"]:hover p {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+html[data-theme="dark"] [data-testid="stTabs"] button[aria-selected="true"],
+html[data-theme="dark"] [data-testid="stTabs"] button[aria-selected="true"] p,
+html[data-theme="dark"] [data-testid="stTabs"] button[aria-selected="true"]:hover,
+html[data-theme="dark"] [data-testid="stTabs"] button[aria-selected="true"]:hover p {
     color: #22d3ee;                                   /* brand */
 }
 
