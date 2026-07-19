@@ -177,10 +177,10 @@ except NotAuthenticated:                                # ⑨ session 失效(401
 
 | `AUTH_MODE` | `resolve_actor()` 行為 | 回傳 |
 |---|---|---|
-| `mock` | 讀 `session_state["actor"]`;若無則預設 admin 身分(如 `Actor("alice", "admin", grade="super_admin")`,供切換器改 grade) | **恆有** `Actor`(mock 不會未登入) |
+| `mock` | 讀 `session_state["actor"]`;若無則預設 admin 身分（如 `Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)`，即 grade=100，供切換器改 grade） | **恆有** `Actor`（mock 不會未登入） |
 | `bff` | 讀 cookie → BFF `GET /api/auth/session` → 解析(見 [auth-flow §4](auth-flow.md));401/無 cookie → `None` | `Actor` 或 `None` |
 
-- `Actor` 型別定義見[資料來源規格 §資料契約](data-source.md#資料契約型別定義):`{username: str, role: "user"|"admin", grade: Optional[str]}`。本系統為 admin-only,`role` 恆 `"admin"`,存取軸為 `grade`(`super_admin`/`editor`/`viewer`);見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
+- `Actor` 型別定義見[資料來源規格 §資料契約](data-source.md#資料契約型別定義):`{username: str, role: "user"|"admin", grade: Optional[int]}`。本系統為 admin-only,`role` 恆 `"admin"`,存取軸為 `grade`（`AdminRole` 數值：0/50/100/999 = viewer/editor/super_admin/root）;見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
 - **關鍵**:`app.py` 只看 `resolve_actor()` 的結果,不關心來源;換認證模式時 `app.py` 不改。
 - `bff` 模式的 token / 快取 / refresh 全在 `lib/auth.py` + `lib/api_client.py` 內處理(見 auth-flow),不外溢到 `app.py`。
 
@@ -192,18 +192,20 @@ except NotAuthenticated:                                # ⑨ session 失效(401
 
 ```python
 # lib/nav.py(概念)
+from lib.models import AdminRole
+
 def build_pages(actor: Actor) -> list:
     pages = [
         st.Page("pages/data_management.py",  title="資料管理"),
         st.Page("pages/realtime_monitor.py", title="即時監控"),
         st.Page("pages/analytics.py",        title="資料分析", default=True),
     ]
-    if actor.role == "admin" and actor.grade == "super_admin":
+    if actor.role == "admin" and actor.grade >= AdminRole.SUPER_ADMIN:
         pages.append(st.Page("pages/system_management.py", title="系統管理"))
     return pages
 ```
 
-- **存取控制**(權威定義見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)):系統管理頁**僅 `grade == "super_admin"` 才註冊**；`editor` / `viewer` 不可見（動態不註冊，比隱藏連結更安全）。`actor.role == "admin"` 的前置條件保留作為 latent 防線（本部署 role 恆 admin，但明確條件讓意圖清晰）。
+- **存取控制**(權威定義見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)):系統管理頁**僅 `grade >= AdminRole.SUPER_ADMIN`（≥100，含 ROOT=999）才註冊**；`editor`（50）/ `viewer`（0）不可見（動態不註冊，比隱藏連結更安全）。`actor.role == "admin"` 的前置條件保留作為 latent 防線（本部署 role 恆 admin，但明確條件讓意圖清晰）。
 - **預設落地頁**:儀表板已移除,改由**資料分析**帶 `default=True`,登入後首先落在資料分析。
 - 骨架階段允許其他業務頁為 placeholder(`st.info("建置中")`),先讓導覽與 gate 成立。
 
@@ -309,11 +311,11 @@ uv run streamlit run app.py # 全 mock 下即可跑
 | Fixture | 用途 |
 |---|---|
 | `seeded_mock_source` | 帶決定性種子的 `MockDataSource`,供 unit 直接斷言 |
-| `actor_super_admin` / `actor_editor` / `actor_viewer` | 三種 grade 的 admin `Actor`,測寫入權限分支(`can_write`);viewer 唯讀 |
+| `actor_super_admin` / `actor_editor` / `actor_viewer` | 三種 grade 的 admin `Actor`（grade=100/50/0）,測寫入權限分支(`can_write`);viewer 唯讀 |
 | `app_at` | `AppTest.from_file("app.py")`,預設 `AUTH_MODE=mock`/`DATA_SOURCE=mock`,可注入指定 actor |
 
-- **unit**(`tests/unit/`):`can_edit` / `can_write`(grade 分支,viewer 唯讀)、`MockDataSource` CRUD/分頁/篩選、`resolve_actor`(mock 分支,含 grade)、`build_pages`(role→頁清單,latent 防線)、`config` 讀旗標。
-- **app**(`tests/app/`):進站顯示導覽、切換 grade 後寫入按鈕停用(viewer)、系統管理頁僅 super_admin 可見（editor/viewer 不可見）、bff 未登入停在導向頁。
+- **unit**(`tests/unit/`):`can_edit` / `can_write`（grade 分支，viewer=0 唯讀）、`MockDataSource` CRUD/分頁/篩選、`resolve_actor`（mock 分支，含 grade int）、`build_pages`（grade≥100 才註冊系統管理頁，含 root=999）、`config` 讀旗標。
+- **app**(`tests/app/`):進站顯示導覽、切換 grade 後寫入按鈕停用（viewer=0）、系統管理頁僅 grade≥100 可見（editor=50/viewer=0 不可見）、bff 未登入停在導向頁。
 
 ---
 
@@ -322,17 +324,17 @@ uv run streamlit run app.py # 全 mock 下即可跑
 每步先寫失敗測試 → 最小實作 → 綠燈重構(golden rule):
 
 1. `lib/config.py`:讀 `DATA_SOURCE`/`AUTH_MODE`,預設 `mock`。(unit)
-2. `lib/models.py`:`Actor`(含 `grade`)+ `can_edit(record, actor)` + `can_write(actor)`(`grade != "viewer"`)。(unit)
-3. `lib/auth.py`:`resolve_actor()` mock 分支(預設 admin 身分如 `alice/admin/super_admin`、grade 可被 session 覆寫)。(unit)
-4. `lib/nav.py`:`build_pages(actor)`——`grade == "super_admin"` 才註冊系統管理頁；`editor`/`viewer` 不可見。(unit)
+2. `lib/models.py`:`Actor`(含 `grade: int`)+ `AdminRole` 常數 + `can_edit(record, actor)` + `can_write(actor)`(`actor.grade > AdminRole.VIEWER`)。(unit)
+3. `lib/auth.py`:`resolve_actor()` mock 分支(預設 admin 身分如 `alice/admin/grade=100`、grade 可被 session 覆寫)。(unit)
+4. `lib/nav.py`:`build_pages(actor)`——`grade >= AdminRole.SUPER_ADMIN`（≥100）才註冊系統管理頁；`editor`（50）/`viewer`（0）不可見。(unit)
 5. `app.py` + `AppTest`:全 mock 下進站顯示導覽、預設落在資料分析(儀表板已移除)。(app)
 6. `MockDataSource.list_records` + `pages/data_management.py`:資料管理頁能列出種子資料。(unit + app)
 7. 之後接續資料管理其餘 CRUD(見 [data-source §落地順序](data-source.md#對齊-tdd-的落地順序))。
 
 **骨架完成定義(Definition of Done)**
 - `streamlit run app.py`(全 mock)能進站、看到導覽與資料管理頁的 mock 資料。
-- 切換 dev 使用者(grade)能改變「編輯/刪除」按鈕停用狀態(viewer 全停用)。
-- 系統管理頁僅 super_admin 可見；editor / viewer 頁面清單不含系統管理。
+- 切換 dev 使用者（grade）能改變「編輯/刪除」按鈕停用狀態（viewer=0 全停用）。
+- 系統管理頁僅 grade≥100（super_admin/root）可見；editor（50）/ viewer（0）頁面清單不含系統管理。
 - `pytest` 全綠。
 
 ---

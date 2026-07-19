@@ -30,7 +30,7 @@
 | 例外 / 狀況 | 語意 | 定義位置 | 對應狀態 |
 |---|---|---|---|
 | `ValidationError` | 使用者輸入不合法(必填空、`category` 不在清單、`value` 非數、非法 `sort` 欄位) | `lib/models.py`(見 [data-source §例外](data-source.md#例外)) | 400 / 422 |
-| `PermissionDenied` | 無寫入權限(`grade == "viewer"`)的 create/update/delete | `lib/models.py`(見 [data-source §例外](data-source.md#例外)) | 403 |
+| `PermissionDenied` | 無寫入權限（`grade == 0`，即 viewer）的 create/update/delete | `lib/models.py`(見 [data-source §例外](data-source.md#例外)) | 403 |
 | `RecordNotFound` | 目標不存在或已軟刪除 | `lib/models.py`(見 [data-source §例外](data-source.md#例外)) | 404 |
 | `NotAuthenticated` | reactive refresh 後仍 401,session 失效 | `lib/models.py`(見 [auth §5](auth.md)、[api-client §3.2](api-client.md)) | 401(重試後) |
 | `ApiError` | 逾時 / 連線錯誤 / 408 / 429 / 5xx / 非預期狀態 / 後端契約破壞 | `lib/api_client.py`(見 [api-client §3.1](api-client.md)) | 5xx / None / 其他 |

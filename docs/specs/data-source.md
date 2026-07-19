@@ -50,11 +50,18 @@ CATEGORIES: list[str] = ["感測器", "系統", "應用", "網路"]   # selectbo
 SORTABLE: list[str]   = ["id", "title", "value", "category", "created_at"]
 DEFAULT_SORT = "id:asc"
 
+class AdminRole:
+    """後端 AdminRole IntEnum 對應數值（JWT grade claim 與 API admin_role 均為 int）。"""
+    VIEWER      = 0
+    EDITOR      = 50
+    SUPER_ADMIN = 100
+    ROOT        = 999   # 受保護 root；is_protected=True；能通過所有 SUPER_ADMIN gate
+
 @dataclass
 class Actor:              # 目前操作者(mock 由開發切換器提供;日後由認證提供)
     username: str
     role: Role               # "user" | "admin"
-    grade: Optional[str] = None  # admin → "super_admin"|"editor"|"viewer"; user → "free"|"premium"
+    grade: Optional[int] = None  # admin → AdminRole 數值 (0/50/100/999); user → None
 
 @dataclass
 class Record:
@@ -90,13 +97,13 @@ class ImportResult:
 
 ### 權限純函式
 
-本系統為 **admin-only**:所有登入者 `role == "admin"`,存取軸為 `grade`(`super_admin` / `editor` / `viewer`);寫入一律限 `grade != "viewer"`。見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
+本系統為 **admin-only**:所有登入者 `role == "admin"`,存取軸為 `grade`（`AdminRole` 數值：0/50/100/999 = viewer/editor/super_admin/root）;寫入一律限 `grade > AdminRole.VIEWER`（>0）。見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
 
 ```python
 def can_write(actor: Actor) -> bool:
-    """寫入 gate(資料 CRUD 與系統管理提權操作共用)。grade != "viewer" → 可寫。"""
+    """寫入 gate(資料 CRUD 與系統管理提權操作共用)。grade > AdminRole.VIEWER → 可寫。"""
     if actor.role == "admin":
-        return actor.grade != "viewer"
+        return (actor.grade or 0) > AdminRole.VIEWER   # grade=0(viewer) → False
     return False                              # role == "user" 為 latent 分支(本部署不出現)
 
 def can_edit(record: Record, actor: Actor) -> bool:
@@ -106,7 +113,7 @@ def can_edit(record: Record, actor: Actor) -> bool:
     return record.created_by == actor.username
 ```
 
-- **`can_write` 是寫入權限的唯一真相**;`can_edit` 的 admin 分支一律委派 `can_write`,不重寫 `grade != "viewer"` 字面,避免兩處漂移。
+- **`can_write` 是寫入權限的唯一真相**;`can_edit` 的 admin 分支一律委派 `can_write`,不重寫 `grade > AdminRole.VIEWER` 字面,避免兩處漂移。
 - 供 mock 來源(擋寫入)與頁面(按鈕 `disabled`)共用、便於單元測試。
 - 本部署下 `can_edit(record, actor) == can_write(actor)`(無 user role,創建者分支不觸發);系統管理頁只需 `can_write`(無 record)。
 
@@ -115,7 +122,7 @@ def can_edit(record: Record, actor: Actor) -> bool:
 | 例外 | 觸發 | 對應後端 |
 |---|---|---|
 | `RecordNotFound` | `get/update/delete` 遇不存在或已軟刪除的 `id` | 404 |
-| `PermissionDenied` | `create/update/delete` 的 `actor` 無寫入權限(`grade == "viewer"`;latent: 非創建者的 user) | 403 |
+| `PermissionDenied` | `create/update/delete` 的 `actor` 無寫入權限（`grade == 0`，即 viewer；latent: 非創建者的 user） | 403 |
 | `ValidationError` | 建立/更新欄位不合法(必填空、`category` 不在清單、`value` 非數) | 422 |
 
 > 兩者為 `lib/` 自訂例外(避免與內建 `PermissionError` 混淆);頁面攔截後以 `st.error` / 停用按鈕呈現。

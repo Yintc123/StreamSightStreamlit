@@ -13,7 +13,7 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-from lib.models import Actor
+from lib.models import Actor, AdminRole
 from lib.realtime import Reading
 
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
@@ -35,7 +35,7 @@ def _open_monitor(actor: Actor, **state) -> AppTest:
 
 # 測試 14：初始化契約——未預設 rt_buffer / rt_tick 亦不 KeyError；viewer 亦可讀
 def test_page_loads_without_state_for_any_grade():
-    at = _open_monitor(Actor("viewer", "admin", grade="viewer"))
+    at = _open_monitor(Actor("viewer", "admin", grade=AdminRole.VIEWER))
     assert not at.exception
     assert any("即時監控" in t.value for t in at.title)
 

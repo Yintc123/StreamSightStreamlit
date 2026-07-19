@@ -8,7 +8,7 @@ import streamlit as st
 
 from lib import auth
 from lib.api_client import ApiError
-from lib.models import Actor, NotAuthenticated
+from lib.models import Actor, AdminRole, NotAuthenticated
 
 
 @pytest.fixture
@@ -27,15 +27,15 @@ def _set_cookies(monkeypatch, cookies: dict):
     monkeypatch.setattr(st, "context", SimpleNamespace(cookies=cookies))
 
 
-_INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "grade": "editor", "accessToken": "jwt", "expiresAt": 123, "csrfToken": "csrf-tok"}
+_INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "grade": 50, "accessToken": "jwt", "expiresAt": 123, "csrfToken": "csrf-tok"}
 
 
 # --- resolve_actor mock 分支(auth §8 測 1–2;APP_ENV 預設 local → AUTH_MODE=mock) ---
 
 def test_resolve_actor_mock_defaults_alice_and_writes_back(fake_session):
-    """mock 預設身分為 alice/admin/super_admin（app-skeleton §4、auth §3）。"""
+    """mock 預設身分為 alice/admin/grade=100（SUPER_ADMIN）（app-skeleton §4、auth §3）。"""
     a = auth.resolve_actor()
-    assert a == Actor("alice", "admin", grade="super_admin")
+    assert a == Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)
     assert fake_session["actor"] == a  # 預設寫回 session
 
 
@@ -81,7 +81,7 @@ def test_resolve_actor_bff_success_sets_actor_and_token(bff_mode, fake_session, 
     _set_cookies(monkeypatch, {"streamsight_session": "raw"})
     monkeypatch.setattr(auth, "_introspect", lambda: _INTROSPECT_OK)
     actor = auth.resolve_actor()
-    assert actor == Actor("alice", "admin", grade="editor")
+    assert actor == Actor("alice", "admin", grade=AdminRole.EDITOR)
     assert fake_session["access_token"] == "jwt"
     assert fake_session["token_expires_at"] == 123
 

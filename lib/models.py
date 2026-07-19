@@ -17,6 +17,14 @@ except ImportError:  # pragma: no cover
 Role = Literal["user", "admin"]
 Category = Literal["感測器", "系統", "應用", "網路"]
 
+
+class AdminRole:
+    """後端 AdminRole IntEnum 對應數值（JWT grade claim 與 API admin_role 均為 int）。"""
+    VIEWER      = 0
+    EDITOR      = 50
+    SUPER_ADMIN = 100
+    ROOT        = 999
+
 # selectbox 與種子共用;list 型別以相容 3.9 寫法
 CATEGORIES = ["感測器", "系統", "應用", "網路"]
 SORTABLE = ["id", "title", "value", "category", "created_at"]
@@ -28,15 +36,15 @@ BULK_MAX_ROWS = 1000
 class Actor:
     """目前操作者(mock 由開發切換器提供;日後由認證提供)。
 
-    grade：對應後端 JWT grade claim。
-      - admin → "super_admin" | "editor" | "viewer"（見後端 AdminRole）
-      - user  → "free" | "premium"（見後端 UserTier）
-      - None  → 未知或不需判斷
+    grade：對應後端 JWT grade claim（int）。
+      - admin → AdminRole 數值 0/50/100/999（見 AdminRole 常數）
+      - user  → None（本系統 admin-only，user 為 latent 分支）
+      - None  → 未知/未設定，can_write 視為 VIEWER（安全預設）
     """
 
     username: str
     role: Role          # "user" | "admin"
-    grade: Optional[str] = None  # admin_role 或 user_tier
+    grade: Optional[int] = None  # AdminRole 數值；user → None
 
 
 @dataclass
@@ -75,11 +83,11 @@ class ImportResult:
 def can_write(actor: Actor) -> bool:
     """寫入權限單一真相（供多頁按鈕 disabled gate 共用）。
 
-    super_admin / editor → True；viewer → False；role='user' → False（latent 防線）。
+    grade > AdminRole.VIEWER（>0）→ True；VIEWER（0）或 None → False；role='user' → False（latent 防線）。
     """
     if actor.role != "admin":
         return False
-    return actor.grade != "viewer"
+    return (actor.grade or 0) > AdminRole.VIEWER
 
 
 def can_edit(record: Record, actor: Actor) -> bool:

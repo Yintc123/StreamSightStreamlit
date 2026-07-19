@@ -7,13 +7,13 @@ from __future__ import annotations
 
 import pytest
 
-from lib.models import Actor
+from lib.models import Actor, AdminRole
 from lib.topbar import _build_topbar_html
 
 
 @pytest.fixture
 def actor():
-    return Actor("alice", "admin", grade="super_admin")
+    return Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)
 
 
 # ── 品牌 ──────────────────────────────────────────────────────────────────────

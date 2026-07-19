@@ -18,11 +18,11 @@
 class Actor:
     username: str
     role: Literal["user", "admin"]
-    grade: Optional[str] = None      # admin → super_admin/editor/viewer;存取軸
+    grade: Optional[int] = None      # admin → AdminRole 數值 0/50/100/999;存取軸
 ```
 
 - `resolve_actor()` 回傳 `Optional[Actor]`;下游(頁面、`can_edit`/`can_write`、`build_pages`)只認 `Actor`。
-- **本系統為 admin-only**:`role` 恆 `"admin"`,存取差異由 `grade` 決定(見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相));故 `resolve_actor` 必須把 introspection 回應的 `grade` 一併帶入 `Actor`,否則 `can_write` 判不到 viewer。
+- **本系統為 admin-only**:`role` 恆 `"admin"`,存取差異由 `grade` 決定(見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相));故 `resolve_actor` 必須把 introspection 回應的 `grade` 一併帶入 `Actor`,否則 `can_write` 判不到 viewer（grade=0）。
 
 ---
 
@@ -47,7 +47,7 @@ class Actor:
 
 | `AUTH_MODE` | 行為 | 回傳 |
 |---|---|---|
-| `mock` | 讀 `session_state["actor"]`;無則預設 `Actor("alice", "admin", grade="super_admin")` 並寫回 | **恆有** `Actor` |
+| `mock` | 讀 `session_state["actor"]`;無則預設 `Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)` 並寫回 | **恆有** `Actor` |
 | `bff` | `raw = raw_cookie()`;無 → `None`。有 → introspection(§4)→ 解析為 `Actor`;401/失敗 → 清狀態回 `None` | `Actor` 或 `None` |
 
 - **mock**:身分由[開發用切換器](app-skeleton.md#4-身分解析resolve_actor兩模式單一出口)寫入 `session_state["actor"]`;`resolve_actor` 只讀不打任何網路。種子預設 `alice/user`。
@@ -77,8 +77,8 @@ class Actor:
 
 ## 4. bff:introspection 解析與 role / grade 映射
 
-- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, grade, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。`grade` 對應後端 JWT grade claim(admin → `super_admin`/`editor`/`viewer`)。
-- **落地**:`session_state["actor"] = Actor(user.name, map_role(role), grade=grade)`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。**`grade` 必須帶入**,否則 `can_write` 判不到 viewer(存取 gate 失效)。
+- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, grade, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。`grade` 對應後端 JWT grade claim，為 **int**（admin → `0`/`50`/`100`/`999` = viewer/editor/super_admin/root；見 `AdminRole` 常數）。
+- **落地**:`session_state["actor"] = Actor(user.name, map_role(role), grade=int(grade))`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。**`grade` 必須以 int 帶入**,否則 `can_write` 判不到 viewer（grade=0，存取 gate 失效）。
 - **role 映射** `map_role`:後端沿用前端 `Role` enum 數值;預設 `1 → "admin"`、其餘 → `"user"`。**確切數值待與前端 `lib/session/types` 對齊**(§7)。
 - **快取**:以 `st.cache_data`(TTL 30–60s、不超過 `expiresAt`)包住「cookie 原值 → introspection 結果」;401 / 登出 / refresh 後主動清快取(auth-flow §4.6)。
 
@@ -123,7 +123,7 @@ class Actor:
 純邏輯 mock cookie / mock introspection,不打真後端;放 `tests/unit/test_auth.py`:
 
 ### mock 分支(骨架階段即可)
-1. `resolve_actor()` 無 `session_state["actor"]` → 回 `Actor("alice","admin",grade="super_admin")` 並寫回（mock 種子預設 super_admin，確保初次開啟可看全部頁面）。
+1. `resolve_actor()` 無 `session_state["actor"]` → 回 `Actor("alice","admin",grade=AdminRole.SUPER_ADMIN)` 並寫回（mock 種子預設 super_admin=100，確保初次開啟可看全部頁面）。
 2. `session_state["actor"]` 已設(如切換器選 admin)→ 原樣回傳。
 3. mock 下呼 `get_access_token()` → `RuntimeError`。
 
@@ -135,7 +135,7 @@ C. bff 模式 + `session_state["actor"]` 未設：輸出 `<meta refresh>` 並呼
 ### bff 分支(接 API 階段)
 4. `map_role(1)→"admin"`、`map_role(0)→"user"`、未知→`"user"`。
 5. `resolve_actor()`:無 cookie → `None`(不打網路)。
-6. 有 cookie + introspection 200 → 回 `Actor`,並落 `access_token`/`token_expires_at`。
+6. 有 cookie + introspection 200 → 回 `Actor(grade=int(grade))`,並落 `access_token`/`token_expires_at`。
 7. introspection 401 → 回 `None`,清狀態。
 8. `refresh_token()`:200 → 回新 token 並回寫;再 401 → 拋 `NotAuthenticated`。
 9. `raw_cookie()`:能從(mock)`st.context.cookies` 取值;無則 `None`。

@@ -6,6 +6,7 @@ from lib.mock_data_source import MockDataSource
 from lib.models import (
     CATEGORIES,
     Actor,
+    AdminRole,
     PermissionDenied,
     RecordNotFound,
     ValidationError,
@@ -177,7 +178,7 @@ def test_update_by_creator_updates_fields_and_timestamp():
 
 def test_update_admin_can_edit_others():
     updated = MockDataSource().update_record(
-        1, {"title": "admin改", "value": 1, "category": "網路"}, Actor("admin", "admin")
+        1, {"title": "admin改", "value": 1, "category": "網路"}, Actor("admin", "admin", grade=AdminRole.EDITOR)
     )
     assert updated.title == "admin改"
 

@@ -19,10 +19,10 @@ import streamlit as st
 from lib import state
 from lib.api_client import ApiClient
 from lib.config import get_settings
-from lib.models import Actor, NotAuthenticated
+from lib.models import Actor, AdminRole, NotAuthenticated
 
-# mock 種子預設身分（app-skeleton §4；供開發切換器覆寫）；super_admin 確保初次開啟即可看到所有頁面
-_DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade="super_admin")
+# mock 種子預設身分（app-skeleton §4；供開發切換器覆寫）；SUPER_ADMIN(100) 確保初次開啟即可看到所有頁面
+_DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)
 
 
 def resolve_actor() -> Optional[Actor]:
@@ -44,7 +44,7 @@ def resolve_actor() -> Optional[Actor]:
         _cached_introspect.clear()  # 401:舊快取失效(auth-flow §4.6)
         state.clear_auth()  # 進站辨識:未登入為正常狀態,清狀態回 None 導向 gate
         return None
-    actor = Actor(data["user"]["name"], map_role(data["role"]), grade=data.get("grade"))
+    actor = Actor(data["user"]["name"], map_role(data["role"]), grade=int(data["grade"]) if data.get("grade") is not None else None)
     state.set_actor(actor)
     state.set_token(data["accessToken"], data["expiresAt"])
     state.set_csrf(data["csrfToken"])

@@ -5,7 +5,7 @@ from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 from lib.api_client import ApiError
-from lib.models import Actor
+from lib.models import Actor, AdminRole
 
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
 
@@ -28,7 +28,7 @@ def test_lists_seed_data_with_row_action_buttons():
 
 def test_viewer_all_buttons_disabled():
     """Viewer admin 唯讀：所有編輯/刪除按鈕停用。"""
-    at = _open_data_management(Actor("viewer", "admin", grade="viewer"))
+    at = _open_data_management(Actor("viewer", "admin", grade=AdminRole.VIEWER))
     disabled_flags = [b.disabled for b in at.button if b.label == "編輯"]
     assert disabled_flags              # 有列出資料
     assert all(disabled_flags)        # 全部停用
@@ -36,7 +36,7 @@ def test_viewer_all_buttons_disabled():
 
 def test_viewer_create_submit_disabled():
     """Viewer：新增分頁的「送出」按鈕停用。"""
-    at = _open_data_management(Actor("viewer", "admin", grade="viewer"))
+    at = _open_data_management(Actor("viewer", "admin", grade=AdminRole.VIEWER))
     submit = next((b for b in at.button if b.label == "送出"), None)
     assert submit is not None
     assert submit.disabled
@@ -71,19 +71,19 @@ def _apply_filter(at: AppTest) -> AppTest:
 
 def test_filter_form_has_search_button():
     """工具列有「搜尋」送出按鈕。"""
-    at = _open_data_management(Actor("admin", "admin", grade="super_admin"))
+    at = _open_data_management(Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN))
     assert any(b.label == "搜尋" for b in at.button)
 
 
 def test_sort_selectbox_exists():
     """工具列有排序選單。"""
-    at = _open_data_management(Actor("admin", "admin", grade="super_admin"))
+    at = _open_data_management(Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN))
     assert _sort_box(at) is not None
 
 
 def test_sort_changes_order():
     """切換排序後，markdown 清單順序改變（標題 ↑ vs 建立時間 ↓）。"""
-    at = _open_data_management(Actor("admin", "admin", grade="super_admin"))
+    at = _open_data_management(Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN))
     default_texts = [m.value for m in at.markdown]
     _sort_box(at).set_value("標題 ↑").run()
     assert not at.exception
@@ -256,7 +256,7 @@ def test_list_records_api_error_shows_error_not_crash(monkeypatch):
     monkeypatch.setattr(_ds_mod, "get_data_source", lambda: _FailDS())
 
     at = AppTest.from_file(APP_PATH)
-    at.session_state["actor"] = Actor("alice", "admin", grade="editor")
+    at.session_state["actor"] = Actor("alice", "admin", grade=AdminRole.EDITOR)
     at.run()
     at.switch_page("pages/data_management.py")
     at.run()

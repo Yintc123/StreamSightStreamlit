@@ -313,7 +313,7 @@ class Alert:
 
 > 以下 AppTest 均採 render-then-sample 執行序（見 §即時刷新）：首幀渲染依「進入該幀時的 `rt_buffer`」，故**注入 `rt_buffer` 即可決定首幀畫面**，無需 monkeypatch 生成器。閾值以注入 `rt_threshold` 控制（slider 在 fragment 外、值經 session_state 讀入）。
 
-14. 登入使用者（admin，任一 grade，例如 `grade="viewer"`）進入（session_state **未預設** `rt_buffer` / `rt_tick`）→ 頁面含「即時監控」標題，無 exception（驗證初始化契約，不觸發 `KeyError`；本頁對所有 grade 開放，viewer 亦可讀）。
+14. 登入使用者（admin，任一 grade，例如 `grade=0`（viewer））進入（session_state **未預設** `rt_buffer` / `rt_tick`）→ 頁面含「即時監控」標題，無 exception（驗證初始化契約，不觸發 `KeyError`；本頁對所有 grade 開放，viewer=0 亦可讀）。
 15. **注入** `rt_buffer=[Reading(now, 42.0)]`（首幀即有資料）→ 含 `st.metric`（指標卡）與閾值 `st.slider`。
 16. **告警可判定**：注入 `rt_buffer=[Reading(now, 50.0)]` ＋ `rt_threshold=10` → `is_over(50.0, 10)` 必為真 → 首幀渲染含 `st.toast`（告警），且**無** `st.error`（告警不佔版面）。以「注入已知值 + 低閾值」使斷言 100% 可判定；**不靠**「閾值設 0」——`is_over` 為嚴格 `>`、值域含 `0.0`，設 0 無法保證超標。
 17. **未預設 / 空 `rt_buffer`**（首幀緩衝為空）→ 首幀渲染含 `st.info`（empty_state），不渲染指標卡。render-then-sample 使冷啟首幀天然為空，empty_state **無需 stub 即可測**（見 §狀態與錯誤處理）。

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
-from lib.models import Actor
+from lib.models import Actor, AdminRole
 
 # repo root 的 app.py(AppTest.from_file 以呼叫端檔案目錄為基準,故用絕對路徑)
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
@@ -24,7 +24,7 @@ def test_app_runs_and_defaults_to_analytics():
 def test_super_admin_can_open_admin_page():
     """super_admin のみ系統管理頁が登録され、内容を閲覧できる。"""
     at = AppTest.from_file(APP_PATH)
-    at.session_state["actor"] = Actor("admin", "admin", grade="super_admin")
+    at.session_state["actor"] = Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN)
     at.run()
     at.switch_page("pages/system_management.py")
     at.run()
