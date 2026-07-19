@@ -46,7 +46,7 @@ class Actor:
 
 | `AUTH_MODE` | 行為 | 回傳 |
 |---|---|---|
-| `mock` | 讀 `session_state["actor"]`;無則預設 `Actor("alice", "user")` 並寫回 | **恆有** `Actor` |
+| `mock` | 讀 `session_state["actor"]`;無則預設 `Actor("alice", "admin", grade="super_admin")` 並寫回 | **恆有** `Actor` |
 | `bff` | `raw = raw_cookie()`;無 → `None`。有 → introspection(§4)→ 解析為 `Actor`;401/失敗 → 清狀態回 `None` | `Actor` 或 `None` |
 
 - **mock**:身分由[開發用切換器](app-skeleton.md#4-身分解析resolve_actor兩模式單一出口)寫入 `session_state["actor"]`;`resolve_actor` 只讀不打任何網路。種子預設 `alice/user`。

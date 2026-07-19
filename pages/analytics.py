@@ -61,9 +61,7 @@ else:
 tab_stat, tab_trend, tab_export = st.tabs(["統計", "趨勢", "匯出"])
 
 with tab_stat:
-    if has_error:
-        pass
-    elif has_data:
+    if has_data:
         stats = agg_stats(df)
         metric_cards([
             Metric("總計", int(stats["sum"])),

@@ -286,19 +286,19 @@ tests/
 ├── conftest.py             # 共用 fixtures(§9)
 ├── unit/                   # lib 純邏輯
 └── app/                    # AppTest 頁面行為
-requirements.txt
+pyproject.toml
+uv.lock
 ```
 
 **bootstrap 指令**(對齊 CLAUDE.md)
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pytest                      # TDD 主迴圈
-streamlit run app.py        # 全 mock 下即可跑
+uv sync                     # 建立 .venv 並安裝相依
+uv run pytest               # TDD 主迴圈
+uv run streamlit run app.py # 全 mock 下即可跑
 ```
 
-- `requirements.txt` 核心:`streamlit`、`pandas`、`pydantic-settings`(骨架第一步 `lib/config.py` 即需,見 [config §6](config.md#6-實作樣式鏡像後端))、`pytest`(接 API 階段再加 `httpx`)。本機為 Python 3.9,安裝時由 pip 解析相容版本並回寫版本號。
-- **不得用 Homebrew 安裝**(CLAUDE.md);一律 `pip` + `requirements.txt`。
+- `pyproject.toml` 核心依賴:`streamlit`、`pandas`、`pydantic-settings`(骨架第一步 `lib/config.py` 即需,見 [config §6](config.md#6-實作樣式鏡像後端))、`pytest`、`httpx`。版本由 `uv.lock` 鎖定。
+- **不得用 Homebrew 安裝**(CLAUDE.md);一律 `uv add <package>`。
 
 ---
 

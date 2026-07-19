@@ -8,7 +8,7 @@
 
 StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 4 頁多頁面架構，依登入角色動態註冊。**登入委派 Next.js 主前端**（`app.py` 偵測未登入時直接 meta refresh 跳轉，無 Streamlit 登入頁）。**Streamlit 為純前端 / API Client，不直接連 DB**：所有資料存取（含認證、CRUD、分析、系統管理）一律透過 `lib/api_client.py` 呼叫 FastAPI（StreamSightBackend）REST API；即時監控連後端 FastAPI WebSocket（見 [ADR 0002](docs/decisions/0002-streamlit-as-api-client.md)）。
 
-- 語言：Python 3.11+ ／ 套件管理：`pip` + `requirements.txt`（虛擬環境 `.venv`）
+- 語言：Python 3.9+ ／ 套件管理：`uv`（`pyproject.toml` + `uv.lock`，虛擬環境 `.venv`）
 - 框架：Streamlit
 - 測試：`pytest` ＋ `streamlit.testing.v1.AppTest`（頁面互動測試）
 - 樣式：主題優先（`.streamlit/config.toml`），CSS 最小化（見設計系統規格）
@@ -68,22 +68,21 @@ StreamSight 的 Streamlit 前端應用。以 `st.navigation` + `st.Page` 組成 
 ## 常用指令
 
 ```bash
-# 建立並啟用虛擬環境
-python -m venv .venv
-source .venv/bin/activate
-
-# 安裝相依
-pip install -r requirements.txt
+# 建立 venv 並安裝相依（首次 / 依賴異動後）
+uv sync
 
 # 測試（TDD 主要迴圈）
-pytest                                  # 全部測試
-pytest tests/unit -v                    # 只跑 unit
-pytest tests/app -v                     # 只跑頁面（AppTest）
-pytest -k <關鍵字>                       # 只跑符合名稱的測試（RED 階段常用）
-pytest -x                               # 遇第一個失敗即停
+uv run pytest                           # 全部測試
+uv run pytest tests/unit -v            # 只跑 unit
+uv run pytest tests/app -v             # 只跑頁面（AppTest）
+uv run pytest -k <關鍵字>               # 只跑符合名稱的測試（RED 階段常用）
+uv run pytest -x                       # 遇第一個失敗即停
 
 # 啟動應用
-streamlit run app.py
+uv run streamlit run app.py
+
+# 新增套件
+uv add <package>
 ```
 
 ### 提交前檢查（全數需通過）
@@ -128,7 +127,7 @@ docs/                      # 架構與頁面 / 樣式規格
 - **存取控制**：角色存於 `st.session_state`；非 Admin **動態不註冊**系統管理頁（比隱藏連結安全），此行為需有測試覆蓋。
 - **樣式**：遵循[設計系統規格](docs/specs/design-system.md)——能用 `config.toml` 主題解決就不寫 CSS；CSS 集中於 `styles/main.css`，於進入點載入一次。
 - **快取**：查詢類資料善用 `st.cache_data` 並設短 TTL，避免每次 rerun 重查。
-- **套件安裝**：一律走 `pip` + `requirements.txt`；**不得透過 Homebrew 安裝**。
+- **套件安裝**：一律走 `uv add <package>`（依賴定義在 `pyproject.toml`，鎖定版本由 `uv.lock` 管理）；**不得透過 Homebrew 安裝**。
 
 ---
 

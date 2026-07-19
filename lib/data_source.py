@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import functools
 from typing import Optional, Protocol
 
 import streamlit as st
@@ -49,19 +50,22 @@ def get_data_source() -> DataSource:
     return _build_api_data_source(settings)
 
 
-def _build_api_data_source(settings) -> DataSource:
+@functools.lru_cache(maxsize=1)
+def _get_api_client():
+    """Process 生命週期共用一個 ApiClient（api-client.md §2 single shared Client）。"""
     import httpx
 
     from lib import auth
-    from lib.api_client import ApiClient, ApiDataSource
+    from lib.api_client import ApiClient
 
+    settings = get_settings()
     timeout = httpx.Timeout(
         connect=settings.http_connect_timeout_seconds,
         read=settings.http_read_timeout_seconds,
         write=settings.http_read_timeout_seconds,
         pool=settings.http_connect_timeout_seconds,
     )
-    client = ApiClient(
+    return ApiClient(
         client=httpx.Client(timeout=timeout),
         get_token=auth.get_access_token,
         refresh_token=auth.refresh_token,
@@ -71,4 +75,9 @@ def _build_api_data_source(settings) -> DataSource:
         retry_base=settings.http_retry_base_seconds,
         retry_factor=settings.http_retry_factor,
     )
-    return ApiDataSource(client, settings.fastapi_base_url)
+
+
+def _build_api_data_source(settings) -> DataSource:
+    from lib.api_client import ApiDataSource
+
+    return ApiDataSource(_get_api_client(), settings.fastapi_base_url)

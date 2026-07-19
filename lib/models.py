@@ -21,6 +21,7 @@ Category = Literal["感測器", "系統", "應用", "網路"]
 CATEGORIES = ["感測器", "系統", "應用", "網路"]
 SORTABLE = ["id", "title", "value", "category", "created_at"]
 DEFAULT_SORT = "id:asc"
+BULK_MAX_ROWS = 1000
 
 
 @dataclass

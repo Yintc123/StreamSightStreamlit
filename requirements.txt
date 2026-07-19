@@ -1,8 +1,0 @@
-# StreamSight Streamlit 前端相依
-# 本機 Python 3.9。
-streamlit==1.50.0
-pandas==2.3.3
-pydantic-settings==2.11.0
-httpx==0.28.1
-openpyxl==3.1.5
-pytest==8.4.2

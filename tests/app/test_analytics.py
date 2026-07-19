@@ -74,6 +74,22 @@ def test_api_error_shows_st_error_with_request_id():
     assert len(at.metric) == 0
 
 
+# 測試 10b
+def test_api_error_empty_state_shown_in_all_tabs():
+    """ApiError 時三分頁均顯示 empty_state() 佔位（統計分頁不應為空白）。"""
+    at = AppTest.from_file(APP_PATH)
+    at.session_state["actor"] = Actor("alice", "user")
+    at.run()
+    at.switch_page("pages/analytics.py")
+
+    err = ApiError("timeout", request_id="req-test-10b")
+    with patch("lib.mock_data_source.MockDataSource.list_records", side_effect=err):
+        at.run()
+
+    empty_infos = [i for i in at.info if i.value == "目前沒有符合條件的資料"]
+    assert len(empty_infos) == 3
+
+
 # 測試 11
 def test_trend_tab_has_granularity_radio():
     """趨勢分頁含粒度選擇 radio（時/日/週）。"""

@@ -145,7 +145,7 @@ def can_edit(record: Record, actor: Actor) -> bool:
 
 ## MockDataSource 行為規格
 
-- **種子資料**:初始化時產生 **40 筆**決定性(固定,不用亂數)假 `Record`,平均分佈於四個分類、跨不同 `created_by`(見下方使用者)、跨時間範圍,讓分頁/篩選/排序看得出效果。
+- **種子資料**:初始化時產生 **200 筆**決定性(固定,不用亂數)假 `Record`,平均分佈於四個分類、跨不同 `created_by`(見下方使用者)、跨時間範圍,讓分頁/篩選/排序看得出效果。
   - `created_at` 以固定基準日往回遞減(如 `2026-07-18T00:00:00Z` 減去 `i` 小時),避免用 `datetime.now()`(利於測試斷言)。
   - `created_by` 循環套用開發切換器的三個 username,確保「有的能編輯、有的停用」都演得到。
 - **儲存位置**:記憶體。以 `st.session_state["mock_records"]` 保存,讓建立/更新/刪除在同一 session 內即時反映;重啟(或清 session)還原種子。純邏輯單元測試則直接 new 一個 `MockDataSource` 傳入初始清單,不依賴 Streamlit。
@@ -219,7 +219,7 @@ st.dataframe(page.items)
 lib/
 ├── models.py          # Actor / Record / Page / ImportResult / RowError + CATEGORIES + can_edit() + 例外
 ├── data_source.py     # DataSource(Protocol) + get_data_source() 工廠(讀 DATA_SOURCE)
-├── mock_data_source.py# MockDataSource(記憶體假資料,含 40 筆決定性種子)
+├── mock_data_source.py# MockDataSource(記憶體假資料,含 200 筆決定性種子)
 └── api_client.py      # (日後) ApiDataSource:呼叫 FastAPI
 pages/
 └── data_management.py # 薄頁面,只呼叫 get_data_source();mock 時掛開發用切換器
@@ -234,7 +234,7 @@ pages/
 > **✅ = 已有測試且通過；❌ = 待補失敗測試**
 
 1. ✅ `can_edit(record, actor)` — Admin 恆真;創建者為真;他人為假。（`tests/unit/test_models.py`）
-2. ✅ `MockDataSource.list_records` — 種子 40 筆、分頁切片、`total` 為篩選後筆數、預設排除軟刪除。（`tests/unit/test_mock_data_source.py`）
+2. ✅ `MockDataSource.list_records` — 種子 200 筆、分頁切片、`total` 為篩選後筆數、預設排除軟刪除。（`tests/unit/test_mock_data_source.py`）
 3. ✅ 篩選 — `category` 精確、`keyword` 不分大小寫子字串。（`tests/unit/test_mock_data_source.py`）
 4. ✅ 排序 — 依 `sort` 欄位/方向正確;非法欄位拋 `ValidationError`。（`tests/unit/test_mock_data_source.py`）
 5. ✅ `create_record` — 欄位驗證;自動帶 `created_by`/時間戳;`total` +1。（`tests/unit/test_mock_data_source.py`）

@@ -71,7 +71,7 @@ def filter_bar(
 ### 行為
 
 - 渲染：`st.columns` 並列 `st.selectbox`（分類）、`st.date_input`（時間範圍，若 `show_date`）、`st.text_input`（關鍵字，若 `show_keyword`）。
-- **狀態初始化**：首次 rerun 時以 `session_state.setdefault(key, default)` 確保各 key 存在，預設值對應 `FilterParams` 欄位的預設（`category` → `categories[0]`、`keyword` → `""`、`date_from` / `date_to` → `None`）。
+- **狀態初始化**：首次 rerun 時以 `session_state.setdefault(key, default)` 確保各 key 存在，預設值對應 `FilterParams` 欄位的預設（`category` → `categories[0]`、`keyword` → `""`、`date_range` → `()`，拆解為 `date_from`/`date_to` → `None`）。
 - 每次 rerun 讀取目前 `session_state` 值作為元件預設，並在元件值改變時自動更新（`on_change` 或 Streamlit 元件天然回寫）。
 - 回傳本次 rerun 的 `FilterParams` 快照；**呼叫端**據此傳入資料查詢，不直接操作 `session_state`。
 - **與分頁的互動**：若同一頁同時使用 `pagination_controls`（共用相同 `key_prefix`），呼叫端應在偵測到篩選條件改變時（即本次快照 ≠ 上次快照）將 `{key_prefix}_page` 重設為 `1`，避免使用者停在無效的高頁碼。建議做法：將前次 `FilterParams` 存於 `session_state`，與本次比較，若不同則 `st.session_state[f"{key_prefix}_page"] = 1`。
@@ -182,8 +182,7 @@ def empty_state(message: str = "目前沒有符合條件的資料") -> None:
 |---|---|
 | `{prefix}_category` | 篩選列目前分類 |
 | `{prefix}_keyword` | 篩選列目前關鍵字 |
-| `{prefix}_date_from` | 篩選列起始日期 |
-| `{prefix}_date_to` | 篩選列結束日期 |
+| `{prefix}_date_range` | 篩選列日期範圍（`tuple[date, date] \| tuple[()]`；Streamlit `date_input(mode="range")` 天然回寫；`FilterParams.date_from`/`date_to` 由呼叫端從 tuple 拆解） |
 | `{prefix}_page` | 分頁列目前頁碼 |
 
 - `key_prefix` 建議採頁面縮寫：`dm`（資料管理）、`an`（分析）、`rt`（即時監控）、`admin_*`（Admin 各分頁）。

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from lib.models import (
+    BULK_MAX_ROWS,
     CATEGORIES,
     DEFAULT_SORT,
     SORTABLE,
@@ -23,8 +24,6 @@ from lib.models import (
     ValidationError,
     can_edit,
 )
-
-_BULK_MAX_ROWS = 1000
 
 # 固定基準日，往回 90 天（≈3 個月）均勻分佈 200 筆，避免 datetime.now()
 _SEED_BASE = datetime(2026, 7, 18, 0, 0, 0, tzinfo=timezone.utc)
@@ -126,8 +125,8 @@ class MockDataSource:
         record.deleted_at = datetime.now(timezone.utc)  # 軟刪除
 
     def bulk_create(self, rows: list, actor: Actor) -> ImportResult:
-        if len(rows) > _BULK_MAX_ROWS:
-            raise ValidationError(f"單檔最多 {_BULK_MAX_ROWS} 列,實際 {len(rows)} 列")
+        if len(rows) > BULK_MAX_ROWS:
+            raise ValidationError(f"單檔最多 {BULK_MAX_ROWS} 列,實際 {len(rows)} 列")
         created = 0
         errors: List[RowError] = []
         for index, row in enumerate(rows):  # 逐列驗證,非法不中斷其餘

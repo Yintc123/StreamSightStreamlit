@@ -14,7 +14,8 @@ import io
 import json
 from typing import List, Optional, Tuple
 
-_MAX_ROWS = 1000
+from lib.models import BULK_MAX_ROWS
+
 _REQUIRED_COLS = {"title", "value", "category"}
 
 
@@ -29,8 +30,8 @@ def parse_csv_bytes(content: bytes) -> Tuple[List[dict], Optional[str]]:
         return [], f"CSV 缺少必要欄位：{', '.join(sorted(missing))}"
 
     rows = list(reader)
-    if len(rows) > _MAX_ROWS:
-        return [], f"單檔最多 {_MAX_ROWS} 列，本次共 {len(rows)} 列"
+    if len(rows) > BULK_MAX_ROWS:
+        return [], f"單檔最多 {BULK_MAX_ROWS} 列，本次共 {len(rows)} 列"
 
     result = []
     for row in rows:
@@ -56,8 +57,8 @@ def parse_json_bytes(content: bytes) -> Tuple[List[dict], Optional[str]]:
     if not isinstance(data, list):
         return [], "JSON 需為物件陣列（頂層 [...]）"
 
-    if len(data) > _MAX_ROWS:
-        return [], f"單檔最多 {_MAX_ROWS} 列，本次共 {len(data)} 列"
+    if len(data) > BULK_MAX_ROWS:
+        return [], f"單檔最多 {BULK_MAX_ROWS} 列，本次共 {len(data)} 列"
 
     result = []
     for item in data:

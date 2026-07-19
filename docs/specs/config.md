@@ -179,7 +179,7 @@ def get_settings() -> BaseSettings_:
 ```
 
 - 對外只 export `get_settings()`;呼叫端不需知道分檔(同後端 `__all__`)。
-- 需新增相依 `pydantic-settings` 至 `requirements.txt`(骨架必要模組;見 [app-skeleton §6](app-skeleton.md#6-lib-分層總表單一入口地圖))。
+- `pydantic-settings` 已列於 `pyproject.toml` 依賴(骨架必要模組;見 [app-skeleton §6](app-skeleton.md#6-lib-分層總表單一入口地圖))。
 
 ---
 
@@ -219,7 +219,7 @@ lib/config.py               # 本規格:AppEnv + BaseSettings 子類 + get_setti
 .streamlit/secrets.toml     # dev 本機設定(不入版控;app-skeleton §8)
 .env / 部署環境變數          # 各環境注入(test 忽略)
 tests/unit/test_config.py   # 測 1–7
-requirements.txt            # + pydantic-settings
+pyproject.toml              # dependencies 含 pydantic-settings
 ```
 
 > 於 [app-skeleton §6 lib 分層總表](app-skeleton.md#6-lib-分層總表單一入口地圖) 中 `lib/config.py` 詳規即本檔;為**骨架必要**模組(第一個被 TDD 的檔)。

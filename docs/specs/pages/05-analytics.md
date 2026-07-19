@@ -130,7 +130,7 @@ st.download_button("⬇ 下載 CSV",
   `目前篩選：分類={category}[，期間 {from} ~ {to}]，共 {n} 筆`；無設定的日期端以「—」表示。
 - **無資料時 `disabled=True`**，防止下載空檔案。
 - `make_excel_bytes` 自動將 tz-aware datetime 轉為 UTC naive（Excel 不支援時區）。
-- `openpyxl` 需在 `requirements.txt` 中。
+- `openpyxl` 已列於 `pyproject.toml` 依賴。
 - 內容與目前篩選條件一致，不另呼叫 API（以 `df` 為準）。
 
 ---
@@ -192,7 +192,7 @@ st.download_button("⬇ 下載 CSV",
 
 外部套件:
 - `pandas`（已存在）
-- `openpyxl`（已加入 `requirements.txt`，Excel 匯出用）
+- `openpyxl`（已列於 `pyproject.toml`，Excel 匯出用）
 
 ---
 
@@ -225,5 +225,5 @@ st.download_button("⬇ 下載 CSV",
 ## 依賴 / 備註
 
 - 匯出內容需與畫面篩選一致。
-- `openpyxl` 加入 `requirements.txt`。
+- `openpyxl` 已列於 `pyproject.toml`。
 - 大範圍查詢（如跨年）前端 pandas 可能壓力大，未來可改由後端提供分析端點；本規格先走前端聚合。

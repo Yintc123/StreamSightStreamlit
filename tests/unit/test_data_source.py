@@ -38,6 +38,18 @@ def test_api_mode_returns_apidatasource(monkeypatch, fake_session):
     assert isinstance(get_data_source(), ApiDataSource)
 
 
+def test_api_datasource_shares_http_client_across_calls(monkeypatch, fake_session):
+    # api-client.md §2：整個 process 共用一個 httpx.Client，避免 TCP handshake 成本
+    import lib.data_source as ds_mod
+    ds_mod._get_api_client.cache_clear()
+
+    monkeypatch.setenv("APP_ENV", "development")
+    ds1 = ds_mod.get_data_source()
+    ds2 = ds_mod.get_data_source()
+    # 兩次取得的 ApiDataSource 必須共用同一個 ApiClient 實例
+    assert ds1._c is ds2._c
+
+
 def test_api_plus_mock_combo_raises_at_startup(monkeypatch):
     # §9 測 9:無效組合由 config 守衛在 get_settings() 啟動時擋下
     monkeypatch.setenv("DATA_SOURCE", "api")
