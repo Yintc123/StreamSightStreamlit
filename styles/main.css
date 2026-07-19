@@ -108,6 +108,22 @@
     text-decoration: none;
 }
 
+/* 登出 <a>（logout.md §6）：覆蓋 .stMarkdownContainer a 的連結色與底線
+   （雙類 0,2,0 > 0,1,1；:visited 亦需明確覆蓋），外觀與 sysitem 一致 */
+.ss-topbar .ss-topbar__logout,
+.ss-topbar .ss-topbar__logout:hover,
+.ss-topbar .ss-topbar__logout:visited {
+    text-decoration: none;
+    color: rgba(15, 23, 42, 0.66);   /* ink-AA，同 sysitem */
+    cursor: pointer;
+}
+
+html[data-theme="dark"] .ss-topbar .ss-topbar__logout,
+html[data-theme="dark"] .ss-topbar .ss-topbar__logout:hover,
+html[data-theme="dark"] .ss-topbar .ss-topbar__logout:visited {
+    color: rgba(230, 237, 246, 0.72);  /* dark ink-AA，同 sysitem */
+}
+
 /* 品牌：mr-2 text-[15px] font-bold text-ink-AAA */
 .ss-topbar__brand {
     margin-right: 8px;

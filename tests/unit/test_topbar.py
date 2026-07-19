@@ -140,12 +140,9 @@ def test_logout_button_present(actor):
     assert "登出" in html
 
 
-def test_logout_button_is_button_element(actor):
-    """登出是 <button> 元素（不是 <a>，避免 GET 請求）。"""
-    html = _build_topbar_html(actor)
-    idx = html.index("登出")
-    before = html[max(0, idx - 200): idx]
-    assert "<button" in before
+# （原 test_logout_button_is_button_element 已作廢：<button onclick> 在
+#   st.markdown 的 react-markdown 管線中靜默失效，登出改為 <a href="?logout=1">，
+#   見 logout.md §2.1；新契約由下方「登出接線」測試覆蓋。）
 
 
 # ── 整體結構 ──────────────────────────────────────────────────────────────────
@@ -154,3 +151,21 @@ def test_topbar_root_class(actor):
     """頂層容器有 ss-topbar class。"""
     html = _build_topbar_html(actor)
     assert 'class="ss-topbar"' in html
+
+
+# ── 登出接線（logout.md §4.1）───────────────────────────────────────────────
+
+def test_logout_is_anchor_not_button(actor):
+    """登出元素為 <a>（onclick 在 st.markdown 的 react-markdown 管線中靜默失效）。"""
+    html = _build_topbar_html(actor)
+    assert '<a class="ss-topbar__logout' in html   # 可同時掛 ss-topbar__sysitem 複用樣式
+    assert '<button class="ss-topbar__sysitem" type="button">登出</button>' not in html
+
+
+def test_logout_href_and_target(actor):
+    """登出 <a> 帶 href='?logout=1' 與 target='_self'（同分頁導航觸發 rerun）。"""
+    html = _build_topbar_html(actor)
+    idx = html.index("ss-topbar__logout")
+    segment = html[idx: idx + 200]
+    assert 'href="?logout=1"' in segment
+    assert 'target="_self"' in segment

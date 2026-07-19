@@ -5,7 +5,7 @@
 """
 import streamlit as st
 
-from lib.auth import resolve_actor
+from lib.auth import logout, resolve_actor
 from lib.config import get_settings
 from lib.models import NotAuthenticated
 from lib.nav import build_pages, render_dev_switcher
@@ -33,6 +33,22 @@ if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.j
         unsafe_allow_html=True,
     )
     st.stop()
+
+# ④′ 登出偵測(TopBar <a href="?logout=1">;必須在 resolve_actor 之後,
+#     確保 bff 模式 CSRF token 已寫入 session_state,見 logout.md §3)
+if st.query_params.get("logout") == "1":
+    logout()  # mock 清狀態;bff POST BFF logout + 清狀態(try/finally 最佳努力)
+    _s = get_settings()
+    if _s.use_mock:
+        st.query_params.clear()  # mock 無登入頁:清 param 後 rerun 以預設角色重進
+        st.rerun()
+    else:
+        _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+        st.markdown(
+            f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+            unsafe_allow_html=True,
+        )
+        st.stop()
 
 if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)

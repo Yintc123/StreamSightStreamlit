@@ -64,7 +64,9 @@ def _build_topbar_html(
         '<div class="ss-topbar__right">'
         f'<span class="ss-topbar__username">{username}</span>'
         f"{theme_btn}"
-        '<button class="ss-topbar__sysitem" type="button">登出</button>'
+        # onclick 在 st.markdown 的 react-markdown 管線中靜默失效，登出走 <a href="?logout=1">
+        # 由 app.py 偵測 query param 執行 auth.logout()（logout.md §2）
+        '<a class="ss-topbar__logout ss-topbar__sysitem" href="?logout=1" target="_self">登出</a>'
         "</div>"
         "</div>"
     )
