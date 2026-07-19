@@ -5,15 +5,21 @@
 import streamlit as st
 
 from lib.auth import require_auth
+from lib.config import get_settings
+from lib.errors import render_error
 from lib.system_management import (
     color_log_level,
-    format_db_size,
+    fetch_infra_snapshot,
+    format_percent,
     seed_db_status,
     seed_logs,
 )
 from lib.ui import Metric, empty_state, filter_bar, metric_cards, pagination_controls
 
 require_auth()
+settings = get_settings()
+
+DB_STATUS_REFRESH_SECONDS = 1.0
 
 # ── 頁面主体 ─────────────────────────────────────────────────────
 st.title("系統管理")
@@ -66,21 +72,35 @@ with logs_tab:
     pagination_controls(log_total, log_size, key_prefix="admin_log")
 
 # ── DB 狀態分頁 ──────────────────────────────────────────────────
-with db_tab:
-    db = seed_db_status()
-    db_ok = db["connected"]
+@st.fragment(run_every=DB_STATUS_REFRESH_SECONDS)
+def db_status_panel() -> None:
+    """每 1 秒局部 rerun：mock 重跑靜態種子；api 重新呼叫 GET /monitoring/infra。"""
+    if settings.use_mock:
+        db = seed_db_status()
+        infra = {
+            "cpu_percent":    db["cpu_percent"],
+            "memory_percent": db["memory_percent"],
+            "db_connections": db["connections"],
+        }
+    else:
+        from lib.data_source import _get_api_client
+
+        try:
+            infra = fetch_infra_snapshot(_get_api_client(), settings.fastapi_base_url)
+        except Exception as exc:
+            render_error(exc)
+            return   # early return；run_every 續跑，後端恢復後自動切回指標
+
     metric_cards([
-        Metric("連線狀態", "正常" if db_ok else "異常", delta_color="off" if db_ok else "inverse"),
-        Metric("各表列數", db["total_rows"]),
-        Metric("DB 大小", format_db_size(db["size_bytes"])),
+        Metric("CPU 佔用率", format_percent(infra["cpu_percent"])),
+        Metric("記憶體佔用率", format_percent(infra["memory_percent"])),
+        Metric(
+            "連線數",
+            infra["db_connections"] if infra["db_connections"] is not None else "N/A",
+        ),
     ])
 
-    st.subheader("即時資料歷史查詢")
-    st.date_input("時間範圍", value=[], key="admin_db_date_range")
-    records = db.get("history_records", [])
-    if records:
-        import pandas as pd
-        st.dataframe(pd.DataFrame(records), hide_index=True, use_container_width=True)
-    else:
-        empty_state("無歷史資料")
+
+with db_tab:
+    db_status_panel()
 

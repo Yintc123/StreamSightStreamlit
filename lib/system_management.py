@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 
 def color_log_level(level: str) -> str:
@@ -22,6 +22,35 @@ def format_db_size(size_bytes: int) -> str:
     return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
+def format_percent(value: Optional[float]) -> str:
+    """百分比 → '{:.1f}%' 字串；None（exporter 未就緒）→ 'N/A'。"""
+    if value is None:
+        return "N/A"
+    return f"{value:.1f}%"
+
+
+def parse_infra_snapshot(snapshots: List[dict]) -> dict:
+    """從後端 InfraHistoryResponse.snapshots 取最新一筆（最後一筆）。
+
+    空 list（後端尚無採樣）→ 全部 None；缺欄位以 .get() 防守。
+    cpu_percent / db_connections 可能為 None（exporter 未就緒）。
+    """
+    if not snapshots:
+        return {"cpu_percent": None, "memory_percent": None, "db_connections": None}
+    latest = snapshots[-1]
+    return {
+        "cpu_percent":    latest.get("cpu_percent"),
+        "memory_percent": latest.get("memory_percent"),
+        "db_connections": latest.get("db_connections"),
+    }
+
+
+def fetch_infra_snapshot(client, base_url: str) -> dict:
+    """呼叫 GET /monitoring/infra 並取最新快照；API 失敗向上拋例外（由頁面 render_error）。"""
+    data = client.request("GET", f"{base_url}/monitoring/infra")
+    return parse_infra_snapshot(data.get("snapshots", []))
+
+
 def seed_logs() -> List[dict]:
     """mock 靜態日誌（含 INFO / WARNING / ERROR；決定性）。"""
     return [
@@ -34,10 +63,9 @@ def seed_logs() -> List[dict]:
 
 
 def seed_db_status() -> dict:
-    """mock 靜態 DB 狀態（決定性）。"""
+    """mock 靜態伺服器狀態（決定性）。"""
     return {
-        "connected":       True,
-        "total_rows":      1250,
-        "size_bytes":      50 * 1024 * 1024,  # 50 MB
-        "history_records": [],
+        "cpu_percent":    45.2,
+        "memory_percent": 62.8,
+        "connections":    5,
     }
