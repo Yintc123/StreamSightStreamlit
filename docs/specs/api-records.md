@@ -85,9 +85,11 @@
 
 ## 4. 串接前必須解決的缺口
 
-### 4.1 ⚠️ 關鍵：analytics 的 `size=1000` 會被夾至 100
+### 4.1 ⚠️ 後端依「是否帶日期」套用不同 size 上限
 
-**問題**：`analytics.py` 目前呼叫 `ds.list_records(page=1, size=1000)`，不帶日期參數。後端對**無日期範圍**請求套用 `records_list_max_page_size=100`，silently 夾值至 100 筆，導致分析圖表資料不完整。
+**背景**：後端對 `size` 依請求是否帶日期範圍套用不同上限（見下方規則）。早期 analytics 以單次 `size=1000` 不帶日期查詢，會被夾至 100 筆導致資料不完整。
+
+**現況（已解決）**：analytics 已改由 `lib/data_source.load_records_df` → `_fetch_all_records` **分頁抓全部**（每頁 `size=1000`，逐頁累積到 `total`），並以落地預設「最近 7 天」使查詢**恆帶日期範圍**（→ 走 analytics_max 上限）。即使使用者清空日期而落到 100 上限，分頁仍會累積到 `total`，只是往返次數較多；**不會截斷**。見 [05-analytics.md §資料](pages/05-analytics.md)。
 
 **後端規則（service 邏輯）**：
 ```
@@ -96,7 +98,7 @@ max_size = records_analytics_max_page_size (預設 5000)  # 若帶 date_from 或
 size = min(max(size, 1), max_size)
 ```
 
-**解法**：`analytics.py` 改為**伺服器端日期篩選**——把 `filter_bar` 已蒐集的 `fp.date_from` / `fp.date_to` 傳給後端，換取 analytics_max（5000）上限，同時讓後端做日期過濾。需要以下步驟（TDD）：
+**實作步驟（TDD；步驟 A/B 已完成，C 以分頁抓全部取代單次 `size=5000`）**：把 `filter_bar` 蒐集的 `fp.date_from` / `fp.date_to` 傳給後端做伺服器端日期過濾，並逐頁抓到 `total`。
 
 **步驟 A — 擴展 `DataSource` protocol（`lib/data_source.py`）**
 
@@ -125,20 +127,18 @@ if date_to:
 
 後端 `date_from` = 含起始 00:00:00 UTC；`date_to` = 含當天末（推進至隔日 00:00:00）。
 
-**步驟 C — 更新 `analytics.py`**
+**步驟 C — `analytics.py` 走 `load_records_df`（分頁抓全部，不設上限）**
 
 ```python
-result = ds.list_records(
-    page=1,
-    size=5000,
-    category=category_param,
-    date_from=fp.date_from,   # 伺服器端篩選
-    date_to=fp.date_to,
-)
-df = records_to_df(result.items)  # 不再需要 client-side filter_by_date
+from lib.data_source import load_records_df
+
+category_param = None if fp.category == "全部" else fp.category
+df = load_records_df(category_param, fp.date_from, fp.date_to)
+# load_records_df 內部分頁抓全部並以 @st.cache_data(ttl=60) 快取；
+# 伺服器端日期篩選由 date_from/date_to 傳入生效，client 端不再 filter_by_date。
 ```
 
-`MockDataSource` 亦需新增 `date_from` / `date_to` 參數（支援 mock 模式正確運作）。
+`MockDataSource` / `ApiDataSource` 均已支援 `date_from` / `date_to` 參數（mock 與 api 模式一致）。
 
 ### 4.2 分類（Categories）仍為硬編碼
 
@@ -204,12 +204,12 @@ FASTAPI_BASE_URL=https://<backend-host>
 3. `ApiDataSource.list_records(date_from=date(2024,1,1))` → 請求帶 `date_from=2024-01-01`。
 4. `ApiDataSource.list_records(date_to=date(2024,12,31))` → 請求帶 `date_to=2024-12-31`。
 5. `ApiDataSource.list_records(date_from=None, date_to=None)` → 請求**不帶** `date_from` / `date_to`（回歸：不傳空值給後端）。
-6. `ApiDataSource.list_records(size=5000, date_from=date(2024,1,1))` → params 含 `size=5000`（analytics 大批量路徑）。
+6. `ApiDataSource.list_records(size=5000, date_from=date(2024,1,1))` → params 原樣含 `size=5000` 與 `date_from`（大 size passthrough；帶日期時後端套 analytics_max）。註：analytics 頁實際以 `load_records_df` 分頁（每頁 `size=1000`）抓全部。
 
 ### 7.3 分析頁整合行為（`tests/app/test_analytics.py`，AppTest）
 
 7. mock 模式：`analytics.py` 帶日期篩選 → `df` 僅含範圍內資料（驗證伺服器端篩選路徑）。
-8. mock 模式：無日期篩選 → 全量資料（回歸）。
+8. mock 模式：清空日期篩選 → 分頁抓全部（不因無日期而截斷；落地預設為「最近 7 天」）。
 
 ---
 

@@ -83,3 +83,80 @@ def test_mock_list_records_no_date_params_returns_all_200():
     assert ds.list_records(size=300).total == 200
 
 
+# --- 分析頁：分頁抓全部 + 快取（05-analytics §資料） ---
+
+def _make_records(n: int):
+    from datetime import datetime, timezone
+    from lib.models import Record
+    dt = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    return [
+        Record(id=i + 1, title=f"t{i}", value=1.0, category="系統",
+               created_by="a", created_at=dt, updated_at=dt)
+        for i in range(n)
+    ]
+
+
+class _CountingDS:
+    """分頁回應的假資料源；記錄 list_records 被呼叫次數。"""
+
+    def __init__(self, records):
+        self._records = records
+        self.calls = 0
+
+    def list_records(self, page=1, size=20, category=None, keyword=None,
+                     sort=None, include_deleted=False, date_from=None, date_to=None):
+        from lib.models import Page
+        self.calls += 1
+        start = (page - 1) * size
+        return Page(items=self._records[start:start + size],
+                    total=len(self._records), page=page, size=size)
+
+
+def test_fetch_all_records_pages_through_every_record():
+    """分頁抓全部：不因單頁 size 上限而截斷，逐頁抓到 total 為止。"""
+    import lib.data_source as ds_mod
+    ds = _CountingDS(_make_records(5))
+    got = ds_mod._fetch_all_records(ds, None, None, None, page_size=2)
+    assert len(got) == 5      # 5 筆全數抓回
+    assert ds.calls == 3      # 2 + 2 + 1，共三頁
+
+
+def test_load_records_df_caches_by_filter_params(monkeypatch):
+    """同一組篩選參數重複呼叫 → 命中 st.cache_data，不再打資料源。"""
+    import lib.data_source as ds_mod
+    calls = {"n": 0}
+
+    def fake_get():
+        calls["n"] += 1
+        return _CountingDS(_make_records(3))
+
+    monkeypatch.setattr(ds_mod, "get_data_source", fake_get)
+    ds_mod.load_records_df.clear()
+    df1 = ds_mod.load_records_df(None, None, None)
+    df2 = ds_mod.load_records_df(None, None, None)
+    assert calls["n"] == 1
+    assert len(df1) == len(df2) == 3
+
+
+def test_build_export_bytes_caches_on_key(monkeypatch):
+    """同一 cache_key 重複呼叫 → 只實際序列化一次（不每次重建 Excel）。"""
+    import lib.analytics as an_mod
+    import lib.data_source as ds_mod
+    df = an_mod.records_to_df(_make_records(3))
+    calls = {"n": 0}
+    real = an_mod.make_excel_bytes
+
+    def spy(x):
+        calls["n"] += 1
+        return real(x)
+
+    monkeypatch.setattr(an_mod, "make_excel_bytes", spy)
+    ds_mod.build_export_bytes.clear()
+    key = ("全部", None, None, len(df))
+    excel1, csv1 = ds_mod.build_export_bytes(df, key)
+    excel2, csv2 = ds_mod.build_export_bytes(df, key)
+    assert calls["n"] == 1        # 第二次命中快取
+    assert excel1 and csv1        # 皆非空 bytes
+    assert b"value" in csv1
+
+

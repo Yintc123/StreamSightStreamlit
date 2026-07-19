@@ -372,7 +372,11 @@ def test_list_records_omits_date_params_when_none():
 
 
 def test_list_records_analytics_size_5000_with_date():
-    """size=5000 + date_from → 查詢帶 size=5000（analytics 大批量，後端用 analytics_max）。"""
+    """大 size + date_from → 查詢原樣帶 size 與 date_from（帶日期時後端套 analytics_max 上限）。
+
+    註：analytics 頁實際改以 load_records_df 分頁（每頁 size=1000）抓全部；本測試僅驗證
+    ApiDataSource 對任意 size 的 passthrough，5000 為「大 size」範例值。
+    """
     from datetime import date
     captured = {}
 

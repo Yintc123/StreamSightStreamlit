@@ -65,6 +65,7 @@ def filter_bar(
     key_prefix: str,
     show_date: bool = True,
     show_keyword: bool = True,
+    default_days: Optional[int] = None,   # 落地預設「最近 N 天」；None → 不預設（全部）
 ) -> FilterParams:
 ```
 
@@ -72,6 +73,7 @@ def filter_bar(
 
 - 渲染：`st.columns` 並列 `st.selectbox`（分類）、`st.date_input`（時間範圍，若 `show_date`）、`st.text_input`（關鍵字，若 `show_keyword`）。
 - **狀態初始化**：首次 rerun 時以 `session_state.setdefault(key, default)` 確保各 key 存在，預設值對應 `FilterParams` 欄位的預設（`category` → `categories[0]`、`keyword` → `""`、`date_range` → `()`，拆解為 `date_from`/`date_to` → `None`）。
+- **`default_days`（僅 `show_date=True` 有效）**：落地頁預設帶「最近 N 天」時間區間，避免一次撈全部造成延遲。以 `session_state.setdefault(f"{prefix}_date_range", default_date_range(date.today(), default_days))` 只植入**首次落地**預設，使用者仍可清空或改選（後續由 widget 回寫尊重）。`None`（預設）維持原本「不預設（全部）」行為。區間由純函式 `default_date_range(today, days) -> (today - days, today)` 計算（見 §8），相對真實時鐘。
 - 每次 rerun 讀取目前 `session_state` 值作為元件預設，並在元件值改變時自動更新（`on_change` 或 Streamlit 元件天然回寫）。
 - 回傳本次 rerun 的 `FilterParams` 快照；**呼叫端**據此傳入資料查詢，不直接操作 `session_state`。
 - **與分頁的互動**：若同一頁同時使用 `pagination_controls`（共用相同 `key_prefix`），呼叫端應在偵測到篩選條件改變時（即本次快照 ≠ 上次快照）將 `{key_prefix}_page` 重設為 `1`，避免使用者停在無效的高頁碼。建議做法：將前次 `FilterParams` 存於 `session_state`，與本次比較，若不同則 `st.session_state[f"{key_prefix}_page"] = 1`。
@@ -83,8 +85,8 @@ def filter_bar(
 ```python
 # 資料管理
 filter_bar(["全部", "感測器", "系統", "應用", "網路"], key_prefix="dm")
-# 分析
-filter_bar(["全部", "感測器", "系統"], key_prefix="an", show_keyword=False)
+# 分析（落地預設最近 7 天，收斂資料量、降低延遲）
+filter_bar(["全部", "感測器", "系統"], key_prefix="an", show_keyword=False, default_days=7)
 # Admin 日誌
 filter_bar(["全部", "INFO", "WARNING", "ERROR"], key_prefix="admin_log")
 ```
@@ -201,6 +203,7 @@ def empty_state(message: str = "目前沒有符合條件的資料") -> None:
 | 4 | `_clamp_page(0, 3)` | `1`（下界） |
 | 5 | `_clamp_page(10, 3)` | `3`（上界） |
 | 6 | `_clamp_page(2, 3)` | `2`（正常值不變） |
+| 7 | `default_date_range(date(2026,7,19), 7)` | `(date(2026,7,12), date(2026,7,19))`；跨度 = `days` |
 
 ### AppTest（`tests/app/test_ui_components.py`）
 

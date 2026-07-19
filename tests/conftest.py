@@ -24,6 +24,18 @@ def _clear_settings_cache() -> None:
 
 
 @pytest.fixture(autouse=True)
+def _clear_analytics_caches():
+    """清掉分析頁 st.cache_data 快取，避免跨測試互相污染（load/export 快取於篩選鍵）。"""
+    try:
+        import lib.data_source as ds_mod
+        ds_mod.load_records_df.clear()
+        ds_mod.build_export_bytes.clear()
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_config_env(monkeypatch):
     """每個測試前清掉設定相關 env 與 get_settings 快取，避免跨測試污染。
 

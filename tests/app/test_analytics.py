@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,9 +16,16 @@ from lib.models import Actor
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
 
 
-def _open_analytics(actor: Actor) -> AppTest:
+# 涵蓋種子資料（2026-04 ~ 2026-07-18）的固定區間；因落地預設改為「最近 7 天」
+# 相對真實時鐘，需資料的測試一律明確指定區間，確保與掛鐘無關、可重現。
+_DATA_RANGE = [date(2026, 4, 1), date(2026, 7, 18)]
+
+
+def _open_analytics(actor: Actor, seed_state: dict | None = None) -> AppTest:
     at = AppTest.from_file(APP_PATH)
     at.session_state["actor"] = actor
+    for key, value in (seed_state or {}).items():
+        at.session_state[key] = value
     at.run()
     at.switch_page("pages/analytics.py")
     at.run()
@@ -34,10 +42,19 @@ def test_page_shows_analytics_title():
 
 # 測試 8
 def test_seed_data_shows_four_metrics():
-    """mock 有資料 → 含 4 個 st.metric（統計指標卡）。"""
-    at = _open_analytics(Actor("alice", "user"))
+    """mock 有資料（指定涵蓋種子的區間）→ 含 4 個 st.metric（統計指標卡）。"""
+    at = _open_analytics(Actor("alice", "user"), seed_state={"an_date_range": _DATA_RANGE})
     assert not at.exception
     assert len(at.metric) >= 4
+
+
+# 測試 8b：落地預設「最近 7 天」時間區間（不再一次撈全部）
+def test_landing_defaults_to_recent_7_day_window():
+    at = _open_analytics(Actor("alice", "user"))
+    rng = at.session_state["an_date_range"]
+    assert isinstance(rng, (list, tuple)) and len(rng) == 2
+    frm, to = rng
+    assert (to - frm).days == 7
 
 
 # 測試 9
@@ -60,12 +77,15 @@ def test_empty_data_shows_info_and_no_metrics():
 # 測試 10
 def test_api_error_shows_st_error_with_request_id():
     """`list_records` 拋 ApiError → st.error 含「錯誤代碼」，指標卡不渲染。"""
+    import lib.data_source as ds_mod
+
     at = AppTest.from_file(APP_PATH)
     at.session_state["actor"] = Actor("alice", "user")
     at.run()
     at.switch_page("pages/analytics.py")
 
     err = ApiError("timeout", request_id="req-test-123")
+    ds_mod.load_records_df.clear()  # 使下一次確實查詢，讓 patch 的錯誤生效（非命中快取）
     with patch("lib.mock_data_source.MockDataSource.list_records", side_effect=err):
         at.run()
 
@@ -77,12 +97,15 @@ def test_api_error_shows_st_error_with_request_id():
 # 測試 10b
 def test_api_error_empty_state_shown_in_all_tabs():
     """ApiError 時三分頁均顯示 empty_state() 佔位（統計分頁不應為空白）。"""
+    import lib.data_source as ds_mod
+
     at = AppTest.from_file(APP_PATH)
     at.session_state["actor"] = Actor("alice", "user")
     at.run()
     at.switch_page("pages/analytics.py")
 
     err = ApiError("timeout", request_id="req-test-10b")
+    ds_mod.load_records_df.clear()  # 同上：跳過快取，讓 patch 的錯誤實際發生
     with patch("lib.mock_data_source.MockDataSource.list_records", side_effect=err):
         at.run()
 
@@ -93,7 +116,7 @@ def test_api_error_empty_state_shown_in_all_tabs():
 # 測試 11
 def test_trend_tab_has_granularity_radio():
     """趨勢分頁含粒度選擇 radio（時/日/週）。"""
-    at = _open_analytics(Actor("alice", "user"))
+    at = _open_analytics(Actor("alice", "user"), seed_state={"an_date_range": _DATA_RANGE})
     assert not at.exception
     radios = [r for r in at.radio if r.label == "粒度"]
     assert radios
@@ -125,8 +148,12 @@ def test_analytics_passes_date_params_to_list_records():
 
 
 # 測試 13
-def test_analytics_no_date_passes_none_to_list_records():
-    """無日期篩選 → list_records 帶 date_from=None, date_to=None（回歸）。"""
+def test_landing_default_window_passed_to_list_records():
+    """落地未手動篩選 → list_records 收到「最近 7 天」區間（非 None、跨度 7 天）。
+
+    取代舊「帶 None（一次撈全部）」行為：改為預設收斂資料量，見 05-analytics.md。
+    """
+    import lib.data_source as ds_mod
     from lib.mock_data_source import MockDataSource
 
     at = _open_analytics(Actor("alice", "user"))
@@ -138,9 +165,11 @@ def test_analytics_no_date_passes_none_to_list_records():
         calls.append(kwargs)
         return orig(self, *args, **kwargs)
 
+    ds_mod.load_records_df.clear()  # 跳過落地時已快取的結果，讓 spy 觀察到實際查詢
     with patch("lib.mock_data_source.MockDataSource.list_records", spy):
         at.run()
 
     assert calls
-    assert calls[0].get("date_from") is None
-    assert calls[0].get("date_to") is None
+    date_from, date_to = calls[0].get("date_from"), calls[0].get("date_to")
+    assert date_from is not None and date_to is not None
+    assert (date_to - date_from).days == 7

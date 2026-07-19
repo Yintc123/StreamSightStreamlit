@@ -12,14 +12,15 @@ from lib.analytics import (
     agg_by_category,
     agg_stats,
     build_export_caption,
-    make_excel_bytes,
-    records_to_df,
     resample_series,
 )
-from lib.data_source import get_data_source
+from lib.data_source import build_export_bytes, load_records_df
 from lib.errors import render_error
 from lib.models import CATEGORIES
 from lib.ui import Metric, empty_state, filter_bar, metric_cards
+
+# 落地預設帶「最近 N 天」，避免一次撈全部造成延遲（見 05-analytics.md §共用篩選列）。
+DEFAULT_WINDOW_DAYS = 7
 
 require_auth()
 
@@ -29,36 +30,28 @@ fp = filter_bar(
     categories=["全部"] + CATEGORIES,
     key_prefix="an",
     show_keyword=False,
+    default_days=DEFAULT_WINDOW_DAYS,
 )
 
-# ── 取資料 ───────────────────────────────────────────────────────────────────
+# ── 取資料（分頁抓全部 + 快取，見 lib/data_source.load_records_df）──────────────
 
 df: pd.DataFrame = pd.DataFrame(columns=["value", "category"])
 has_error = False
 
+category_param = None if fp.category == "全部" else fp.category
 try:
-    ds = get_data_source()
-    category_param = None if fp.category == "全部" else fp.category
-    result = ds.list_records(
-        page=1,
-        size=5000,
-        category=category_param,
-        date_from=fp.date_from,
-        date_to=fp.date_to,
-    )
-    df = records_to_df(result.items)
+    df = load_records_df(category_param, fp.date_from, fp.date_to)
 except Exception as exc:
     render_error(exc)
     has_error = True
 
 has_data = not df.empty
 
-# ── 匯出資料準備（在 tab 外計算，三分頁共用同一份）─────────────────────────
+# ── 匯出資料準備（快取於篩選條件，避免每次 rerun 重建 Excel/CSV）─────────────
 
 if has_data:
-    export_df = df.reset_index()
-    excel_bytes = make_excel_bytes(export_df)
-    csv_bytes = export_df.to_csv(index=False).encode("utf-8-sig")
+    export_cache_key = (fp.category, fp.date_from, fp.date_to, len(df))
+    excel_bytes, csv_bytes = build_export_bytes(df, export_cache_key)
 else:
     excel_bytes = b""
     csv_bytes = b""

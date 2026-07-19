@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from math import ceil
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 try:
     from typing import Literal
@@ -54,6 +54,15 @@ def _page_caption(page: int, total_pages: int, total: int) -> str:
 def _clamp_page(page: int, total_pages: int) -> int:
     """確保頁碼在 [1, total_pages] 內（資料異動後頁碼可能越界）。"""
     return max(1, min(page, total_pages))
+
+
+def default_date_range(today: date, days: int) -> Tuple[date, date]:
+    """回傳 (today - days, today) 的日期區間，供落地頁預設「最近 N 天」。
+
+    純函式（不依賴系統時鐘）：呼叫端傳入 today，方便單元測試。
+    用途見 filter_bar(default_days=...) 與 docs/specs/pages/05-analytics.md。
+    """
+    return (today - timedelta(days=days), today)
 
 
 # ---------------------------------------------------------------------------
@@ -113,21 +122,33 @@ def filter_bar(
     key_prefix: str,
     show_date: bool = True,
     show_keyword: bool = True,
+    default_days: Optional[int] = None,
 ) -> FilterParams:
     """篩選列 UI；回傳本次 rerun 的 FilterParams 快照。
 
     session_state keys（以 key_prefix 為 namespace）：
       {prefix}_category, {prefix}_keyword, {prefix}_date_from, {prefix}_date_to
+
+    default_days（僅在 show_date=True 時有效）：落地頁預設帶「最近 N 天」時間
+    區間，避免一次撈全部造成延遲（見 05-analytics.md）。只作首次落地預設
+    （setdefault），使用者仍可清空或改選；None → 維持原本「不預設（全部）」。
     """
     cat_key = f"{key_prefix}_category"
     kw_key = f"{key_prefix}_keyword"
     df_key = f"{key_prefix}_date_from"
     dt_key = f"{key_prefix}_date_to"
+    range_key = f"{key_prefix}_date_range"
 
     st.session_state.setdefault(cat_key, categories[0])
     st.session_state.setdefault(kw_key, "")
     st.session_state.setdefault(df_key, None)
     st.session_state.setdefault(dt_key, None)
+    if show_date and default_days is not None:
+        # 首次落地才植入預設區間；日期 widget 綁定 range_key，session 已有值時
+        # st.date_input 的 value= 會被忽略，故以 setdefault 尊重使用者後續調整。
+        st.session_state.setdefault(
+            range_key, list(default_date_range(date.today(), default_days))
+        )
 
     col_count = 1 + (1 if show_date else 0) + (1 if show_keyword else 0)
     cols = st.columns(col_count)
