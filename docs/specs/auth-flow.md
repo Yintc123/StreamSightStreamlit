@@ -108,7 +108,7 @@ Streamlit 無法解 cookie,故由 BFF 提供 introspection。**採 Design B:BFF 
   "data": {
     "user": { "id": "u_123", "name": "alice" },
     "role": 1,
-    "grade": 100,
+    "adminRole": "super_admin",
     "accessToken": "<JWT>",
     "expiresAt": 1699999999000,
     "csrfToken": "<43-char base64url>"
@@ -116,7 +116,7 @@ Streamlit 無法解 cookie,故由 BFF 提供 introspection。**採 Design B:BFF 
 }
 ```
 - `role`:沿用前端 `Role` enum 的數值(`ADMIN` / `USER`;見前端 `lib/session/types`)。Streamlit 端以 helper 映射成 `"admin"` / `"user"`。本系統為 admin-only,`role` 恆 admin。
-- `grade`:後端 JWT grade claim，為 **int**（`AdminRole` 數值：`0`=viewer / `50`=editor / `100`=super_admin / `999`=root）;為**存取軸**,Streamlit 端以 `int(grade)` 帶入 `Actor.grade`,供 `can_write`（`grade > AdminRole.VIEWER`）判斷。見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
+- `adminRole`（optional，BFF camelCase **字串** enum）：值為 `'viewer'`/`'editor'`/`'super_admin'`/`'root'`（Next.js `lib/schemas/auth.ts AdminRole`）；login route 將後端整數 rank 轉字串，session route 回傳同一字串。Streamlit 端以 `_BFF_ADMIN_ROLE` dict 映射回 `AdminRole` 整數（`viewer→0`, `editor→50`, `super_admin→100`, `root→999`）;為**存取軸**,供 `can_write`/`build_pages` gate 使用。非 admin 使用者不帶此欄位，Streamlit 解為 `grade=None`。見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)。
 - `accessToken`:FastAPI 用的 Bearer JWT。BFF 回傳前若偵測即將過期,應先跑 refresh(前端 `001c` §3 的鎖去重流程),確保回傳的是有效 token。
 - `expiresAt`:epoch ms,供 Streamlit 端快取 TTL 與提前 refresh 判斷。
 - `csrfToken`:供 Streamlit 發 logout 時帶 `X-CSRF-Token`;存 `session_state["csrf_token"]`,避免登出時需額外打 `/api/csrf`(見 §7.3、015 §2.3)。

@@ -21,24 +21,15 @@ def _open_system_management(actor: Actor) -> AppTest:
 
 # --- 5 / 7. 僅 super_admin 可見（標題 + 三分頁） ---
 
-def test_page_has_title_and_three_tabs():
-    """super_admin 進入 → 頁面含「系統管理」標題且含三個分頁（06-admin §TDD test 7）。"""
+def test_page_has_title_and_two_tabs():
+    """super_admin 進入 → 頁面含「系統管理」標題且只有兩個分頁（管理員管理已移至主前端）。"""
     at = _open_system_management(Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN))
     assert not at.exception
     assert any("系統管理" in t.value for t in at.title)
     tab_labels = [t.label for t in at.tabs]
     assert "日誌" in tab_labels
     assert "DB 狀態" in tab_labels
-    assert "管理員管理" in tab_labels
-    assert "使用者" not in tab_labels
-    assert "權限" not in tab_labels
-
-
-def test_viewer_cannot_see_system_management():
-    """viewer は build_pages に系統管理が含まれないため直接ナビゲートしても表示されない。"""
-    at = _open_system_management(Actor("viewer", "admin", grade=AdminRole.VIEWER))
-    assert not at.exception
-    assert not any("系統管理" in t.value for t in at.title)
+    assert "管理員管理" not in tab_labels
 
 
 # --- 6. DB 狀態分頁含 metric 指標 ---
@@ -76,15 +67,3 @@ def test_log_date_filter_works_without_type_error():
     assert any("無符合條件的日誌" in i.value for i in at.info)
 
 
-# --- 10. 管理員管理分頁（06-admin §TDD test 10）---
-
-def test_admin_tab_renders_seed_list_and_root_buttons_disabled():
-    """管理員管理分頁渲染種子 admin 列表（無 exception）；
-    root（is_protected=True）的封存 / 刪除按鈕為 disabled。
-    """
-    at = _open_system_management(Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN))
-    assert not at.exception
-    # 種子 admins 已渲染（頁面不 crash）
-    # root 的封存/刪除按鈕為 disabled
-    archive_buttons = [b for b in at.button if b.label in ("封存", "刪除") and b.disabled]
-    assert archive_buttons  # 至少 root 的按鈕是 disabled

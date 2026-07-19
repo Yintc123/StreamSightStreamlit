@@ -27,7 +27,7 @@ def _set_cookies(monkeypatch, cookies: dict):
     monkeypatch.setattr(st, "context", SimpleNamespace(cookies=cookies))
 
 
-_INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "grade": 50, "accessToken": "jwt", "expiresAt": 123, "csrfToken": "csrf-tok"}
+_INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "adminRole": "editor", "accessToken": "jwt", "expiresAt": 123, "csrfToken": "csrf-tok"}
 
 
 # --- resolve_actor mock 分支(auth §8 測 1–2;APP_ENV 預設 local → AUTH_MODE=mock) ---
@@ -84,6 +84,36 @@ def test_resolve_actor_bff_success_sets_actor_and_token(bff_mode, fake_session, 
     assert actor == Actor("alice", "admin", grade=AdminRole.EDITOR)
     assert fake_session["access_token"] == "jwt"
     assert fake_session["token_expires_at"] == 123
+
+
+def test_resolve_actor_bff_admin_role_root_string_maps_to_999(bff_mode, fake_session, monkeypatch):
+    """BFF 回傳 adminRole='root'（字串）→ Actor.grade=999（AdminRole.ROOT）。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    monkeypatch.setattr(auth, "_introspect", lambda: {
+        **_INTROSPECT_OK, "adminRole": "root"
+    })
+    actor = auth.resolve_actor()
+    assert actor.grade == AdminRole.ROOT  # 999
+
+
+def test_resolve_actor_bff_admin_role_super_admin_string_maps_to_100(bff_mode, fake_session, monkeypatch):
+    """BFF 回傳 adminRole='super_admin'（字串）→ Actor.grade=100（AdminRole.SUPER_ADMIN）。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    monkeypatch.setattr(auth, "_introspect", lambda: {
+        **_INTROSPECT_OK, "adminRole": "super_admin"
+    })
+    actor = auth.resolve_actor()
+    assert actor.grade == AdminRole.SUPER_ADMIN  # 100
+
+
+def test_resolve_actor_bff_admin_role_viewer_string_maps_to_0(bff_mode, fake_session, monkeypatch):
+    """BFF 回傳 adminRole='viewer'（字串）→ Actor.grade=0（AdminRole.VIEWER）。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    monkeypatch.setattr(auth, "_introspect", lambda: {
+        **_INTROSPECT_OK, "adminRole": "viewer"
+    })
+    actor = auth.resolve_actor()
+    assert actor.grade == AdminRole.VIEWER  # 0
 
 
 def test_resolve_actor_bff_stores_csrf_token(bff_mode, fake_session, monkeypatch):

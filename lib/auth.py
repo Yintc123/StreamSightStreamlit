@@ -24,6 +24,14 @@ from lib.models import Actor, AdminRole, NotAuthenticated
 # mock 種子預設身分（app-skeleton §4；供開發切換器覆寫）；SUPER_ADMIN(100) 確保初次開啟即可看到所有頁面
 _DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)
 
+# BFF 以字串 enum 回傳 adminRole（lib/schemas/auth.ts）
+_BFF_ADMIN_ROLE: dict[str, int] = {
+    "viewer":      AdminRole.VIEWER,
+    "editor":      AdminRole.EDITOR,
+    "super_admin": AdminRole.SUPER_ADMIN,
+    "root":        AdminRole.ROOT,
+}
+
 
 def resolve_actor() -> Optional[Actor]:
     """身分單一出口:吸收 mock / bff 差異,app.py 只看回傳值。"""
@@ -44,7 +52,10 @@ def resolve_actor() -> Optional[Actor]:
         _cached_introspect.clear()  # 401:舊快取失效(auth-flow §4.6)
         state.clear_auth()  # 進站辨識:未登入為正常狀態,清狀態回 None 導向 gate
         return None
-    actor = Actor(data["user"]["name"], map_role(data["role"]), grade=int(data["grade"]) if data.get("grade") is not None else None)
+    # BFF 以字串 enum 回傳 adminRole（'root'/'super_admin'/'editor'/'viewer'），不帶欄位時為 None
+    grade_raw = data.get("adminRole")
+    grade: Optional[int] = _BFF_ADMIN_ROLE.get(grade_raw) if isinstance(grade_raw, str) else None
+    actor = Actor(data["user"]["name"], map_role(data["role"]), grade=grade)
     state.set_actor(actor)
     state.set_token(data["accessToken"], data["expiresAt"])
     state.set_csrf(data["csrfToken"])

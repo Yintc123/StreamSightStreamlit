@@ -77,8 +77,8 @@ class Actor:
 
 ## 4. bff:introspection 解析與 role / grade 映射
 
-- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, grade, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。`grade` 對應後端 JWT grade claim，為 **int**（admin → `0`/`50`/`100`/`999` = viewer/editor/super_admin/root；見 `AdminRole` 常數）。
-- **落地**:`session_state["actor"] = Actor(user.name, map_role(role), grade=int(grade))`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。**`grade` 必須以 int 帶入**,否則 `can_write` 判不到 viewer（grade=0，存取 gate 失效）。
+- **introspection 呼叫**:`GET {BFF}/api/auth/session`,以 `raw_cookie()` 轉發 cookie(api-client `auth="cookie"`);回應 `{ user, role, adminRole?, accessToken, expiresAt, csrfToken }`(auth-flow §3.1、015 §2.3)。`adminRole` 為 BFF camelCase **字串** enum（`'root'`/`'super_admin'`/`'editor'`/`'viewer'`，對應 Next.js `lib/schemas/auth.ts AdminRole`）；login route 登入時將後端整數 rank 轉成字串存入 session，session route 回傳同一字串。Streamlit 端以 `_BFF_ADMIN_ROLE` dict 映射回整數 `AdminRole`（`viewer→0`, `editor→50`, `super_admin→100`, `root→999`）。不帶 `adminRole` 欄位（非 admin 使用者）→ `grade=None`。
+- **落地**:`session_state["actor"] = Actor(user.name, map_role(role), grade=_BFF_ADMIN_ROLE.get(adminRole))`、`["access_token"] = accessToken`、`["token_expires_at"] = expiresAt`、`["csrf_token"] = csrfToken`。**adminRole 字串必須正確對應**,否則 `can_write`/`build_pages` gate 失效。
 - **role 映射** `map_role`:後端沿用前端 `Role` enum 數值;預設 `1 → "admin"`、其餘 → `"user"`。**確切數值待與前端 `lib/session/types` 對齊**(§7)。
 - **快取**:以 `st.cache_data`(TTL 30–60s、不超過 `expiresAt`)包住「cookie 原值 → introspection 結果」;401 / 登出 / refresh 後主動清快取(auth-flow §4.6)。
 
