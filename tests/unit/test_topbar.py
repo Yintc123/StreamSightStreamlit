@@ -132,6 +132,24 @@ def test_theme_btn_shown_when_toggle_enabled(actor):
     assert "ss-topbar__theme-btn" in html
 
 
+def _theme_btn_segment(html: str) -> str:
+    """擷取 theme-btn <button>…</button> 片段（避免誤中其他元素）。"""
+    idx = html.index("ss-topbar__theme-btn")
+    return html[idx: html.index("</button>", idx)]
+
+
+def test_theme_btn_interactive_when_toggle_enabled(actor):
+    """啟用切換（theme-toggle.md §6.2.4）時按鈕可互動：不含 disabled。"""
+    html = _build_topbar_html(actor, enable_theme_toggle=True)
+    assert "disabled" not in _theme_btn_segment(html)
+
+
+def test_theme_btn_has_initial_aria_pressed(actor):
+    """啟用時按鈕帶初始 aria-pressed='true'（light 猜測，JS syncButton 校正）。"""
+    html = _build_topbar_html(actor, enable_theme_toggle=True)
+    assert 'aria-pressed="true"' in _theme_btn_segment(html)
+
+
 # ── 右側：登出按鈕 ────────────────────────────────────────────────────────────
 
 def test_logout_button_present(actor):

@@ -191,7 +191,9 @@ html[data-theme="dark"] .ss-topbar .ss-topbar__logout:visited {
     white-space: nowrap;
 }
 
-/* ThemeToggle icon 按鈕：w-9(36px) h-9(36px) rounded-md(6px)，目前 disabled（功能停用） */
+/* ThemeToggle icon 按鈕：w-9(36px) h-9(36px) rounded-md(6px)。
+ * 啟用態（enable_theme_toggle=1，無 disabled）→ 可互動 + hover；
+ * 停用佔位（=0 開發預覽時的 disabled 按鈕）→ 以 :disabled 表達（theme-toggle.md §6.2.6）。 */
 .ss-topbar__theme-btn {
     width: 36px;
     height: 36px;
@@ -203,8 +205,18 @@ html[data-theme="dark"] .ss-topbar .ss-topbar__logout:visited {
     color: rgba(15, 23, 42, 0.66);  /* ink-AA */
     background: transparent;
     border: none;
-    cursor: default;
+    cursor: pointer;
     flex-shrink: 0;
+    opacity: 1;
+}
+
+.ss-topbar__theme-btn:hover:not(:disabled) {
+    color: #0f172a;                     /* ink-AAA */
+    background: rgba(15, 23, 42, 0.12); /* line */
+}
+
+.ss-topbar__theme-btn:disabled {
+    cursor: default;
     opacity: 0.6;
 }
 
@@ -432,6 +444,15 @@ html[data-theme="dark"] .ss-topbar__username {
 }
 
 html[data-theme="dark"] .ss-topbar__theme-btn {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA（可互動） */
+}
+
+html[data-theme="dark"] .ss-topbar__theme-btn:hover:not(:disabled) {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    background: rgba(230, 237, 246, 0.08);
+}
+
+html[data-theme="dark"] .ss-topbar__theme-btn:disabled {
     color: rgba(230, 237, 246, 0.45);                 /* ink-A（停用態偏暗） */
 }
 

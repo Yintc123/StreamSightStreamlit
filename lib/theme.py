@@ -5,9 +5,12 @@
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import streamlit as st
+
+from lib.topbar import _MOON_SVG, _SUN_SVG
 
 THEME_COOKIE = "theme"
 THEME_COOKIE_MAX_AGE = 31_536_000  # 1 year（對齊 Frontend schema.ts）
@@ -49,9 +52,63 @@ _FORCE_LIGHT_JS = r"""
 """
 
 
+# 啟用切換功能（ENABLE_THEME_TOGGLE=1）時注入的 client-side 切換腳本。
+# 純 client-side：讀 cookie → 設 data-theme → 寫 cookie → 換 icon/aria，全程不 rerun
+# （theme-toggle.md §6.2.3）。__SUN__/__MOON__/"__SECURE__" 由 build_theme_toggle_js
+# 以 json.dumps 安全填入。per-element dataset 旗標防重複綁定（每次 rerun 皆新按鈕）。
+_THEME_TOGGLE_JS = r"""
+(function () {
+  var pdoc = window.parent.document;
+  var SUN = __SUN__, MOON = __MOON__;
+  var SECURE = "__SECURE__";
+  function readTheme() {
+    var m = pdoc.cookie.match(/(?:^|;\s*)theme=(light|dark)(?:;|$)/);
+    return m ? m[1] : 'light';
+  }
+  function applyTheme(t) {
+    pdoc.documentElement.dataset.theme = t;
+    pdoc.cookie = 'theme=' + t + '; Max-Age=31536000; Path=/; SameSite=Lax' + SECURE;
+  }
+  function syncButton(btn, t) {
+    var isLight = t === 'light';
+    btn.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+    btn.setAttribute('aria-label', isLight ? '切換為深色' : '切換為淺色');
+    btn.innerHTML = isLight ? SUN : MOON;
+  }
+  var current = readTheme();
+  applyTheme(current);
+  pdoc.documentElement.setAttribute('data-theme-ready', '');
+  var tries = 0;
+  (function bind() {
+    var btn = pdoc.querySelector('.ss-topbar__theme-btn');
+    if (!btn) { if (tries++ < 10) requestAnimationFrame(bind); return; }
+    syncButton(btn, pdoc.documentElement.dataset.theme || current);
+    if (!btn.dataset.ssThemeBound) {
+      btn.dataset.ssThemeBound = '1';
+      btn.addEventListener('click', function () {
+        var next = (pdoc.documentElement.dataset.theme === 'dark') ? 'light' : 'dark';
+        applyTheme(next);
+        syncButton(pdoc.querySelector('.ss-topbar__theme-btn'), next);
+      });
+    }
+  })();
+})();
+"""
+
+
 def build_force_light_js() -> str:
     """回傳強制白天模式的 client-side JS（清除 Streamlit 記住的深色 Appearance）。"""
     return _FORCE_LIGHT_JS
+
+
+def build_theme_toggle_js(is_prod: bool = False) -> str:
+    """回傳啟用態的 ThemeToggle 切換 JS（SVG 與 Secure 片段以 json.dumps 安全填入）。"""
+    secure = "; Secure" if is_prod else ""
+    return (
+        _THEME_TOGGLE_JS.replace("__SUN__", json.dumps(_SUN_SVG))
+        .replace("__MOON__", json.dumps(_MOON_SVG))
+        .replace('"__SECURE__"', json.dumps(secure))
+    )
 
 
 def load_css(path: str = "styles/main.css") -> None:
@@ -77,9 +134,13 @@ def init_theme_state() -> None:
         st.session_state["theme"] = "light"
 
 
-def inject_theme_js() -> None:
-    """每次 rerun 注入冪等 ThemeToggle JS（純 client-side 切換，不觸發 Python rerun）。"""
+def inject_theme_js(enable_theme_toggle: bool = False, is_prod: bool = False) -> None:
+    """每次 rerun 注入冪等 ThemeToggle JS（純 client-side，不觸發 Python rerun）。
+
+    enable_theme_toggle=True → 注入可切換的 _THEME_TOGGLE_JS；False → 固定 light 的
+    _THEME_JS。兩者皆前置 _FORCE_LIGHT_JS，鎖 Streamlit 內建元件恆 light（§11）。
+    """
     import streamlit.components.v1 as components
-    components.html(
-        f"<script>{_FORCE_LIGHT_JS}{_THEME_JS}</script>", height=0
-    )
+
+    theme_js = build_theme_toggle_js(is_prod) if enable_theme_toggle else _THEME_JS
+    components.html(f"<script>{_FORCE_LIGHT_JS}{theme_js}</script>", height=0)

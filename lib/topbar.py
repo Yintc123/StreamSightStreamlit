@@ -1,7 +1,8 @@
 """TopBar：對齊 StreamSightFrontend CmsTopBar（h-12 bg-surface-card border-b border-line px-4）。
 
 品牌 + 系統切換 Nav（管理後台 / 資料平台）+ 右側（username、ThemeToggle icon、登出）。
-ThemeToggle 目前功能停用，固定白天主題；icon 仍顯示（視覺佔位）。
+ThemeToggle 由 ENABLE_THEME_TOGGLE 控制：關閉時 icon 不渲染；開啟時渲染可互動按鈕，
+切換由 client-side JS 完成（theme-toggle.md §6.2）。
 """
 from __future__ import annotations
 
@@ -45,10 +46,14 @@ def _build_topbar_html(
     """純函式：產生 TopBar HTML 字串（不依賴 Streamlit，可單元測試）。"""
     cms_href = cms_base_url if cms_base_url else "#"
     username = _html.escape(actor.username) if actor else ""
-    icon = _SUN_SVG if theme == "light" else _MOON_SVG
+    # 初始伺服器渲染以 light 為預設猜測（icon＝太陽、aria-pressed=true）；
+    # 真正的 live 主題由 client-side JS 依 cookie 於載入時校正（theme-toggle.md §6.2.4）。
+    is_light = theme == "light"
+    icon = _SUN_SVG if is_light else _MOON_SVG
     theme_btn = (
-        f'<button class="ss-topbar__theme-btn" type="button" disabled '
-        f'aria-label="切換為深色">{icon}</button>'
+        f'<button class="ss-topbar__theme-btn" type="button" '
+        f'aria-pressed="{"true" if is_light else "false"}" '
+        f'aria-label="{"切換為深色" if is_light else "切換為淺色"}">{icon}</button>'
         if enable_theme_toggle
         else ""
     )

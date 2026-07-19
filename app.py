@@ -7,7 +7,7 @@ import streamlit as st
 
 from lib import idle
 from lib.auth import logout, resolve_actor
-from lib.config import get_settings
+from lib.config import AppEnv, get_settings
 from lib.models import NotAuthenticated
 from lib.nav import build_pages, render_dev_switcher
 from lib.request_id import init_logging
@@ -72,8 +72,15 @@ if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
 _cms_url = get_settings().bff_cms_url
-render_topbar(actor, cms_base_url=_cms_url, theme=st.session_state["theme"])  # ⑥ 自訂頂列
-inject_theme_js()  # ⑦ 注入 ThemeToggle JS（冪等；在 topbar DOM 後執行）
+_enable_toggle = get_settings().enable_theme_toggle
+_is_prod = get_settings().app_env == AppEnv.PRODUCTION
+render_topbar(  # ⑥ 自訂頂列
+    actor,
+    cms_base_url=_cms_url,
+    theme=st.session_state["theme"],
+    enable_theme_toggle=_enable_toggle,
+)
+inject_theme_js(enable_theme_toggle=_enable_toggle, is_prod=_is_prod)  # ⑦ ThemeToggle JS（冪等）
 idle.inject_idle_js()  # ⑦′ 注入閒置計時器 JS（冪等；純 client-side 偵測滑鼠/鍵盤）
 
 try:

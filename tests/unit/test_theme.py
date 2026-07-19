@@ -3,7 +3,12 @@ from __future__ import annotations
 import streamlit as st
 
 from lib import theme
-from lib.theme import build_force_light_js, build_theme_cookie_string, parse_theme
+from lib.theme import (
+    build_force_light_js,
+    build_theme_cookie_string,
+    build_theme_toggle_js,
+    parse_theme,
+)
 
 
 def test_load_css_injects_style_tag(monkeypatch, tmp_path):
@@ -132,3 +137,84 @@ def test_force_light_js_reloads_to_apply():
 def test_force_light_js_guards_against_reload_loop():
     """以 sessionStorage 旗標防止無限重載。"""
     assert "sessionStorage" in build_force_light_js()
+
+
+# ── 主題切換 JS（啟用態，theme-toggle.md §6.2.3）─────────────────────────────
+#
+# ThemeToggle 啟用時的 client-side 切換腳本。JS 為字串常數，比照 _FORCE_LIGHT_JS
+# 以「子字串斷言」驗證關鍵操作存在；端到端點擊行為（DOM/cookie 真的變）另以
+# 瀏覽器煙霧測試涵蓋（非 pytest 範圍）。
+
+
+def test_toggle_js_reads_theme_cookie():
+    """讀 parent document 的 theme cookie。"""
+    js = build_theme_toggle_js()
+    assert "pdoc.cookie" in js
+    assert "match(" in js
+
+
+def test_toggle_js_converges_unknown_to_light():
+    """未知 / 缺省 cookie 收斂到 'light'（決策 D1-a）。"""
+    assert "m ? m[1] : 'light'" in build_theme_toggle_js()
+
+
+def test_toggle_js_registers_click_listener():
+    """對切換按鈕註冊 click 監聽器。"""
+    js = build_theme_toggle_js()
+    assert "addEventListener" in js
+    assert "'click'" in js
+
+
+def test_toggle_js_guards_duplicate_binding():
+    """以 per-element dataset 旗標防止重複綁定（Streamlit rerun 產生新按鈕）。"""
+    assert "ssThemeBound" in build_theme_toggle_js()
+
+
+def test_toggle_js_cookie_has_max_age():
+    """切換寫 cookie 帶 Max-Age=31536000（對齊 Frontend）。"""
+    assert "Max-Age=31536000" in build_theme_toggle_js()
+
+
+def test_toggle_js_no_secure_in_dev():
+    """is_prod=False → cookie 不含 Secure。"""
+    assert "Secure" not in build_theme_toggle_js(is_prod=False)
+
+
+def test_toggle_js_has_secure_in_prod():
+    """is_prod=True → cookie 含 Secure。"""
+    assert "Secure" in build_theme_toggle_js(is_prod=True)
+
+
+def test_toggle_js_swaps_sun_and_moon_icons():
+    """syncButton 依主題換太陽 / 月亮 SVG。"""
+    js = build_theme_toggle_js()
+    assert "circle cx=" in js          # 太陽（json.dumps 後引號被轉義）
+    assert "M21 12.79A9" in js         # 月亮 path
+
+
+# ── inject_theme_js 分支（依 enable_theme_toggle）──────────────────────────────
+
+
+def _capture_injected_html(monkeypatch, **kwargs) -> str:
+    import streamlit.components.v1 as components
+
+    captured: dict = {}
+    monkeypatch.setattr(components, "html", lambda body, **kw: captured.setdefault("body", body))
+    theme.inject_theme_js(**kwargs)
+    return captured["body"]
+
+
+def test_inject_theme_js_enabled_injects_click_listener(monkeypatch):
+    """enable_theme_toggle=True → 注入含 click 監聽的切換 JS。"""
+    assert "addEventListener" in _capture_injected_html(monkeypatch, enable_theme_toggle=True)
+
+
+def test_inject_theme_js_disabled_has_no_click_listener(monkeypatch):
+    """enable_theme_toggle=False → 仍是固定 light 的 _THEME_JS，無 click 監聽。"""
+    assert "addEventListener" not in _capture_injected_html(monkeypatch, enable_theme_toggle=False)
+
+
+def test_inject_theme_js_always_includes_force_light(monkeypatch):
+    """兩種模式都保留 _FORCE_LIGHT_JS（鎖 Streamlit 內建元件為 light）。"""
+    assert "stActiveTheme" in _capture_injected_html(monkeypatch, enable_theme_toggle=True)
+    assert "stActiveTheme" in _capture_injected_html(monkeypatch, enable_theme_toggle=False)
