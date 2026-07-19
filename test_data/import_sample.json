@@ -1,0 +1,14 @@
+[
+  {"title": "溫度感測器-D1", "value": 22.8, "category": "感測器", "note": "機房 D 區入口"},
+  {"title": "濕度感測器-D2", "value": 58.4, "category": "感測器", "note": "機房 D 區中段"},
+  {"title": "煙霧感測器-D3", "value": 0.0, "category": "感測器", "note": ""},
+  {"title": "主機 CPU 使用率", "value": 45.6, "category": "系統", "note": "api-01"},
+  {"title": "主機記憶體使用率", "value": 77.2, "category": "系統", "note": "api-01 偏高"},
+  {"title": "系統開機天數", "value": 128, "category": "系統", "note": "db-02"},
+  {"title": "登入服務回應時間", "value": 95.3, "category": "應用", "note": "單位 ms"},
+  {"title": "報表產生耗時", "value": 412.7, "category": "應用", "note": "每小時批次"},
+  {"title": "快取命中率", "value": 93.1, "category": "應用", "note": "redis 主節點"},
+  {"title": "對外頻寬使用", "value": 64.5, "category": "網路", "note": "單位 Mbps"},
+  {"title": "DNS 查詢延遲", "value": 12.4, "category": "網路", "note": "單位 ms"},
+  {"title": "防火牆阻擋次數", "value": 87, "category": "網路", "note": "近一小時"}
+]
