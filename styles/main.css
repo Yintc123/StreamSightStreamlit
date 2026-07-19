@@ -370,3 +370,101 @@ section[data-testid="stSidebar"] {
     padding: 1rem;
     border-radius: 12px;
 }
+
+/* ============================================================
+ * ThemeToggle — 深色主題覆寫
+ * 對齊 Frontend globals.css @theme（dark base）+ [data-theme="light"] 覆寫邏輯。
+ * 特異度 html[data-theme="dark"] .class = (0,2,0) > 單類 (0,1,0)；
+ *         html[data-theme="dark"] [attr]  = (0,2,1) > Streamlit 注入元素規則。
+ * 見 docs/specs/theme-toggle.md §6.2
+ * ============================================================ */
+
+/* ── TopBar ──────────────────────────────────────────────────────────────── */
+
+html[data-theme="dark"] .ss-topbar {
+    background-color: #151c2b;                        /* surface-card */
+    border-bottom-color: rgba(230, 237, 246, 0.12);   /* line */
+}
+
+html[data-theme="dark"] .ss-topbar .ss-topbar__brand,
+html[data-theme="dark"] .ss-topbar .ss-topbar__brand:hover,
+html[data-theme="dark"] .ss-topbar .ss-topbar__brand:visited,
+html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem,
+html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem:hover {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    text-decoration: none;
+}
+
+html[data-theme="dark"] .ss-topbar__sysitem--active,
+html[data-theme="dark"] .ss-topbar__sysitem--active:hover {
+    background-color: rgba(34, 211, 238, 0.14);       /* brand-overlay（cyan） */
+    color: #22d3ee;                                   /* brand */
+}
+
+html[data-theme="dark"] .ss-topbar__accent {
+    color: #22d3ee;                                   /* brand */
+}
+
+html[data-theme="dark"] .ss-topbar__username {
+    color: rgba(230, 237, 246, 0.45);                 /* ink-A */
+}
+
+html[data-theme="dark"] .ss-topbar__theme-btn {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] .ss-topbar__theme-btn:hover {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    background-color: rgba(230, 237, 246, 0.12);      /* line */
+}
+
+/* ── Sidebar Nav ─────────────────────────────────────────────────────────── */
+
+/* 側欄背景：覆蓋 config.toml secondaryBackgroundColor #f1f5f9 */
+html[data-theme="dark"] section[data-testid="stSidebar"] > div {
+    background-color: #151c2b;                        /* surface-card */
+}
+
+html[data-theme="dark"] [data-testid="stSidebarNavLink"] {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] [data-testid="stSidebarNavLink"]:hover {
+    background-color: rgba(230, 237, 246, 0.08);      /* nav-hover */
+    color: rgba(230, 237, 246, 0.72);
+}
+
+html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"] {
+    background-color: rgba(230, 237, 246, 0.14);      /* nav-active */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+html[data-theme="dark"] [data-testid="stSidebarCollapseButton"] button {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] [data-testid="stSidebarCollapseButton"] button:hover {
+    background-color: rgba(230, 237, 246, 0.08);      /* nav-hover */
+}
+
+html[data-theme="dark"] [data-testid="stSidebarResizeHandle"]:hover::after {
+    background-color: #22d3ee;                        /* brand（cyan） */
+}
+
+/* ── FOUC Guard + 平滑過渡 ───────────────────────────────────────────────── */
+/* 對齊 Frontend globals.css 014b §3.4：transition 僅在 JS 掛上
+ * [data-theme-ready] 後啟用，避免首屏初始色觸發過渡動畫。 */
+
+html[data-theme-ready],
+html[data-theme-ready] * {
+    transition-property: color, background-color, border-color;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-theme-ready],
+    html[data-theme-ready] * {
+        transition: none !important;
+    }
+}

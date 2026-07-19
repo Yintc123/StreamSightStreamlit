@@ -121,16 +121,69 @@ def test_username_element_has_class(actor):
 # ── 右側：ThemeToggle ─────────────────────────────────────────────────────────
 
 def test_theme_toggle_has_aria_label(actor):
-    """ThemeToggle 按鈕有 aria-label='切換為深色'（light mode 太陽圖示，對齊 ThemeToggle.tsx aria-label）。"""
+    """ThemeToggle 按鈕預設（dark）有 aria-label='切換為淺色'（對齊 ThemeToggle.tsx aria-label）。"""
     html = _build_topbar_html(actor)
-    assert 'aria-label="切換為深色"' in html
+    assert 'aria-label="切換為淺色"' in html
 
 
 def test_theme_toggle_has_sun_svg(actor):
-    """ThemeToggle 包含太陽 SVG（circle + 8 條 line，對齊 ThemeToggle.tsx light mode）。"""
+    """ThemeToggle 預設（dark）顯示月亮 SVG（對齊 ThemeToggle.tsx dark mode MoonPaths）。"""
     html = _build_topbar_html(actor)
-    assert "<circle" in html
-    assert "<line" in html
+    assert "M21 12.79" in html
+
+
+def test_theme_toggle_dark_shows_moon(actor):
+    """theme='dark' 時，ThemeToggle 含月亮 path（MoonPaths SVG）。"""
+    html = _build_topbar_html(actor, theme="dark")
+    assert "M21 12.79" in html
+
+
+def test_theme_toggle_dark_no_circle(actor):
+    """theme='dark' 時，不含太陽 <circle>（圖示互斥）。"""
+    html = _build_topbar_html(actor, theme="dark")
+    assert "<circle" not in html
+
+
+def test_theme_toggle_light_shows_sun(actor):
+    """theme='light' 時，ThemeToggle 含太陽圖示（circle + 8 line）。"""
+    html = _build_topbar_html(actor, theme="light")
+    assert "<circle" in html and "<line" in html
+
+
+def test_theme_toggle_light_no_moon(actor):
+    """theme='light' 時，不含月亮 path（圖示互斥）。"""
+    html = _build_topbar_html(actor, theme="light")
+    assert "M21 12.79" not in html
+
+
+def test_theme_toggle_aria_pressed_false_when_dark(actor):
+    """dark mode：aria-pressed='false'（isLight=False，對齊 ThemeToggle.tsx aria-pressed={isLight}）。"""
+    html = _build_topbar_html(actor, theme="dark")
+    assert 'aria-pressed="false"' in html
+
+
+def test_theme_toggle_aria_pressed_true_when_light(actor):
+    """light mode：aria-pressed='true'（isLight=True）。"""
+    html = _build_topbar_html(actor, theme="light")
+    assert 'aria-pressed="true"' in html
+
+
+def test_theme_toggle_aria_label_switch_to_light_when_dark(actor):
+    """dark mode：aria-label='切換為淺色'（下一個動作是切到淺色）。"""
+    html = _build_topbar_html(actor, theme="dark")
+    assert 'aria-label="切換為淺色"' in html
+
+
+def test_theme_toggle_aria_label_switch_to_dark_when_light(actor):
+    """light mode：aria-label='切換為深色'（下一個動作是切到深色）。"""
+    html = _build_topbar_html(actor, theme="light")
+    assert 'aria-label="切換為深色"' in html
+
+
+def test_theme_toggle_default_is_dark(actor):
+    """theme 未傳時預設 dark（呼叫端無需明確傳值）。"""
+    html = _build_topbar_html(actor)
+    assert "M21 12.79" in html
 
 
 def test_theme_toggle_has_class(actor):

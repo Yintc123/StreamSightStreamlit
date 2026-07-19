@@ -11,7 +11,7 @@ from lib.models import NotAuthenticated
 from lib.nav import build_pages, render_dev_switcher
 from lib.request_id import init_logging
 from lib.state import clear_auth
-from lib.theme import load_css
+from lib.theme import inject_theme_js, init_theme_state, load_css
 from lib.topbar import render_topbar
 
 st.set_page_config(
@@ -19,8 +19,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )  # ① 頁面設定(必須最先)
-load_css()  # ② 載入一次 CSS
-init_logging()  # ②′ 結構化 log 管線（冪等，掛 request-id filter）
+load_css()          # ② 載入一次 CSS
+init_theme_state()  # ②′ 主題 session_state 初始化（dark 預設，見 theme-toggle.md §8）
+init_logging()      # ②″ 結構化 log 管線（冪等，掛 request-id filter）
 
 actor = resolve_actor()  # ③ 身分解析(mock/bff 單一出口)
 
@@ -38,7 +39,8 @@ if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
 
 _s2 = get_settings()
 _cms_url = f"{_s2.bff_base_url}{_s2.bff_cms_path}"
-render_topbar(actor, cms_base_url=_cms_url)  # ⑥ 自訂頂列（全模式）
+render_topbar(actor, cms_base_url=_cms_url, theme=st.session_state["theme"])  # ⑥ 自訂頂列
+inject_theme_js()  # ⑦ 注入 ThemeToggle JS（冪等；在 topbar DOM 後執行）
 
 try:
     pages = build_pages(actor)  # ⑦ 依 actor.grade 動態組頁清單(見 §5)
