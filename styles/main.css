@@ -482,13 +482,23 @@ html[data-theme="dark"] section[data-testid="stSidebar"] > div {
     background-color: #151c2b;                        /* surface-card */
 }
 
-html[data-theme="dark"] [data-testid="stSidebarNavLink"] {
+/* 未選取項：ink-AA（CmsSideNav.tsx text-ink-AA）。
+ * 內層 p/span 需明列——Streamlit 對其設明確 textColor（light 黑字），
+ * 僅靠 <a> 繼承蓋不過（同 active 規則的處理方式）。 */
+html[data-theme="dark"] [data-testid="stSidebarNavLink"],
+html[data-theme="dark"] [data-testid="stSidebarNavLink"] p,
+html[data-theme="dark"] [data-testid="stSidebarNavLink"] span {
     color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] [data-testid="stSidebarNavLink"]:hover,
+html[data-theme="dark"] [data-testid="stSidebarNavLink"]:hover p,
+html[data-theme="dark"] [data-testid="stSidebarNavLink"]:hover span {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA（hover 文字不變） */
 }
 
 html[data-theme="dark"] [data-testid="stSidebarNavLink"]:hover {
     background-color: rgba(230, 237, 246, 0.08);      /* nav-hover */
-    color: rgba(230, 237, 246, 0.72);
 }
 
 html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"],
