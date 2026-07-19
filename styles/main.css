@@ -628,6 +628,26 @@ html[data-theme="dark"] [data-baseweb="textarea"] textarea::placeholder {
     color: rgba(230, 237, 246, 0.45);                 /* ink-A */
 }
 
+/* widget 標籤與選項文字（selectbox / text_input / number_input 的 label、
+ * radio / checkbox 選項）：Streamlit 對 label 內層 p/span 設明確 textColor
+ * （light 黑字），僅靠 .stApp 繼承蓋不過，需明列（同 Sidebar Nav 的處理） */
+html[data-theme="dark"] [data-testid="stMain"] label,
+html[data-theme="dark"] [data-testid="stMain"] label p,
+html[data-theme="dark"] [data-testid="stMain"] label span {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* selectbox 顯示值：內層 div 亦有明確色，容器規則（> div）蓋不到 */
+html[data-theme="dark"] [data-baseweb="select"] div {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* number_input 步進按鈕（+/-）：預設 secondaryBackground 淺灰 */
+html[data-theme="dark"] [data-testid="stNumberInput"] button {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
 /* selectbox 下拉選單（body portal 內的 listbox） */
 html[data-theme="dark"] [data-baseweb="popover"] [role="listbox"] {
     background-color: #151c2b;                        /* surface-card */
