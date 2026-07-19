@@ -326,5 +326,280 @@ class Alert:
 
 - Streamlit 端**無新增第三方依賴**（`pandas` / `altair` 均為 Streamlit 既有相依；`st.fragment` / `st.altair_chart` 為內建）。
 - 接後端 cycle 才需要：FastAPI WebSocket 端點、`lib/` WebSocket client。
+
+---
+
+## 接後端 WS Cycle（DATA_SOURCE=api）
+
+> **狀態：待實作**。對齊後端規格 [`realtime-stream.md`](../../../../StreamSightBackend/docs/specs/realtime-stream.md)（`RealtimeStreamer` task，`realtime.stream` topic，ticket 認證）。後端先達 Green，前端此節緊接實作。
+
+### 概覽
+
+mock 階段 `live_panel()` 第 2 段（每幀 `sample_value`）以 **`RealtimeWsClient`**（daemon thread + asyncio loop）取代。`live_panel()` 第 1 段（渲染邏輯）**完全不變**——仍讀 `st.session_state["rt_buffer"]`，差異只在「資料從哪來」。
+
+**三個改動（合計約 60 行）**：
+
+| 檔案 | 動作 |
+|---|---|
+| `lib/realtime_ws.py` | **新增**；WS client 純 Python（daemon thread + asyncio loop + threading.Lock）|
+| `lib/config.py` | 新增 `fastapi_ws_url` property（`http→ws`、`https→wss`）|
+| `pages/realtime_monitor.py` | 初始化 `RealtimeWsClient`；`live_panel()` 移除第 2 段；改讀 `ws.buffer` |
+
+---
+
+### 資料流（接後端端到端）
+
+```
+FastAPI lifespan
+  └── RealtimeStreamer（每秒）
+        ├── Redis INCR "realtime:tick"
+        ├── sample_value(tick) → float
+        └── Publisher.to_topic("realtime.stream", {type, topic, value, ts})
+                │   Redis PUBLISH "ws:topic:realtime.stream"
+                ▼
+        WsBridge._dispatch → ConnectionManager.send_local
+                │   per-conn asyncio.Queue → writer task → WebSocket frame
+                ▼
+Streamlit RealtimeWsClient（daemon thread, asyncio.new_event_loop）
+        ├── POST {http_base}/ws/ticket  Bearer JWT → ticket
+        ├── WS  {ws_base}/ws?ticket={ticket}
+        ├── send {"type":"subscribe","topic":"realtime.stream"}
+        └── recv {"type":"data","topic":"realtime.stream","value":42.3,"ts":"..."}
+                │   _on_reading(Reading(ts=..., value=42.3))
+                │   threading.Lock → self._buffer = trim(old + [r], MAX_POINTS)
+                ▼
+st.fragment(run_every=1.0)
+  buffer = ws.buffer   （thread-safe 快照）
+  → 渲染圖表（第 1 段，不變）
+```
+
+---
+
+### `lib/realtime_ws.py` 模組契約（新增）
+
+**設計約束**：
+- Streamlit 的 session 是單執行緒；WS 連線不能在主執行緒以 `asyncio.run()` 阻塞。
+- 方案：一個 `daemon=True` 的背景執行緒，執行緒內自建獨立 `asyncio.new_event_loop()`。
+- 緩衝以 `threading.Lock` 保護（**不**直接寫 `st.session_state`，避免跨執行緒 Streamlit 內部狀態衝突）；fragment 每秒以 `ws.buffer` 屬性讀出快照。
+
+#### 公開 API
+
+```python
+class RealtimeWsClient:
+    def __init__(
+        self,
+        *,
+        http_base: str,          # fastapi_base_url（http/https）
+        ws_base: str,            # fastapi_ws_url（ws/wss）
+        get_token: Callable[[], str],   # lambda: st.session_state.get("access_token","")
+    ) -> None: ...
+
+    def start(self) -> None:
+        """啟動 daemon 執行緒；連線與訂閱在執行緒內非同步完成。"""
+
+    def stop(self) -> None:
+        """設定 stop 事件；執行緒最多 30 s（backoff 上限）內自行退出。"""
+
+    @property
+    def buffer(self) -> list[Reading]:
+        """thread-safe 快照（copy）；fragment 每幀讀此值、不持有 lock。"""
+
+    @property
+    def last_error(self) -> str | None:
+        """最近一次連線 / 訂閱 / 讀取失敗的訊息；`None` 表示正常。"""
+```
+
+#### 內部設計
+
+```python
+# 執行緒進入點（不對外暴露）
+def _run_with_reconnect(
+    http_base, ws_base, get_token,
+    on_reading: Callable[[Reading], None],
+    stop: threading.Event,
+    on_error: Callable[[str], None],
+) -> None:
+    loop = asyncio.new_event_loop()
+    wait = 1.0
+    while not stop.is_set():
+        try:
+            loop.run_until_complete(
+                _connect_and_subscribe(http_base, ws_base, get_token, on_reading, stop)
+            )
+            wait = 1.0   # 正常完成（stop 設定），直接退出
+        except Exception as exc:
+            on_error(str(exc))
+            stop.wait(timeout=wait)             # 指數退避（1 → 2 → 4 → … ≤ 30 s）
+            wait = min(wait * 2, 30.0)
+```
+
+```python
+async def _connect_and_subscribe(http_base, ws_base, get_token, on_reading, stop):
+    # 1. 取 ticket
+    async with httpx.AsyncClient() as http:
+        resp = await http.post(
+            f"{http_base}/ws/ticket",
+            headers={"Authorization": f"Bearer {get_token()}"},
+        )
+        resp.raise_for_status()
+        ticket = resp.json()["ticket"]
+
+    # 2. WS 連線 + 訂閱 + 接收
+    async with websockets.connect(f"{ws_base}/ws?ticket={ticket}") as ws:
+        await ws.send(json.dumps({"type": "subscribe", "topic": "realtime.stream"}))
+        async for raw in ws:
+            if stop.is_set():
+                break
+            msg = json.loads(raw)
+            if msg.get("type") == "data" and msg.get("topic") == "realtime.stream":
+                on_reading(Reading(
+                    ts=datetime.fromisoformat(msg["ts"]).astimezone(),   # UTC → 本地
+                    value=float(msg["value"]),
+                ))
+```
+
+**Backoff 細節**：初始 1 s，每次失敗翻倍，上限 30 s；`stop.wait(timeout=wait)` 使 stop 事件立即中斷等待（不讓 session 結束後仍在掛起）。
+
+**Token 注入**：`get_token: Callable[[], str]` 設計為 lambda 捕捉 `session_state`，讓 `RealtimeWsClient` 與 Streamlit 解耦且可在 unit test 注入 stub。
+
+---
+
+### `lib/config.py` 補充
+
+在 `BaseAppSettings` 加 `fastapi_ws_url` property（不是設定項，由 `fastapi_base_url` 衍生）：
+
+```python
+@property
+def fastapi_ws_url(self) -> str:
+    """將 http(s) URL 轉為對應的 ws(s) URL。"""
+    return (
+        self.fastapi_base_url
+        .replace("https://", "wss://")
+        .replace("http://", "ws://")
+    )
+```
+
+> 替換順序釘死：先處理 `https`（含 `http` 前綴），再處理 `http`；避免 `https://` 被先替換為 `wss//` 後找不到 `http://` 的問題。
+
+---
+
+### 頁面改動（`pages/realtime_monitor.py`）
+
+#### fragment 外：初始化 WsClient
+
+```python
+# DATA_SOURCE=api 時，於頁面進入時初始化並啟動 WS client（一次性）
+if settings.data_source == "api" and "rt_ws_client" not in st.session_state:
+    ws = RealtimeWsClient(
+        http_base=settings.fastapi_base_url,
+        ws_base=settings.fastapi_ws_url,
+        get_token=lambda: st.session_state.get("access_token", ""),
+    )
+    ws.start()
+    st.session_state["rt_ws_client"] = ws
+```
+
+#### `live_panel()` 第 1 段：`buffer` 來源切換
+
+```python
+@st.fragment(run_every=1.0)
+def live_panel():
+    # ── 1) 渲染（不變）──
+    if settings.data_source == "api":
+        ws: RealtimeWsClient = st.session_state["rt_ws_client"]
+        if ws.last_error:
+            render_error(ws.last_error)
+            return                          # 停止刷新（early return）
+        buffer = ws.buffer
+    else:
+        buffer = st.session_state["rt_buffer"]
+
+    threshold = st.session_state.get("rt_threshold", int(DEFAULT_THRESHOLD))
+    if not buffer:
+        empty_state("資料串流啟動中…")
+    else:
+        st.caption(f"最後更新 {buffer[-1].ts.strftime('%H:%M:%S')}")
+        metric_cards(summary_metrics(buffer, threshold))
+        if is_over(buffer[-1].value, threshold):
+            st.toast(alert_message(buffer[-1].value, threshold), icon="⚠️")
+        st.altair_chart(build_chart(buffer, "line"), use_container_width=True)
+        st.altair_chart(build_chart(buffer[-RECENT_POINTS:], "bar"), use_container_width=True)
+
+    # ── 2) 生成（mock 專屬，DATA_SOURCE=mock 時才執行）──
+    if settings.data_source != "api":
+        tick = st.session_state["rt_tick"]
+        reading = Reading(ts=datetime.now().astimezone(), value=sample_value(tick))
+        st.session_state["rt_buffer"] = trim(buffer + [reading], MAX_POINTS)
+        st.session_state["rt_tick"] = tick + 1
+```
+
+> **執行序釘死**：`buffer = ws.buffer` 先讀快照，再依快照渲染，無需改變 render-then-sample 模型——WS 模型天然是「非同步到達 → 渲染當前快照」，語意對齊。
+
+#### Session 結束清理（可選）
+
+```python
+# 可在 app.py on_close / session_state 清理鉤子呼叫
+if "rt_ws_client" in st.session_state:
+    st.session_state["rt_ws_client"].stop()
+```
+
+---
+
+### session_state 契約（新增 key）
+
+現有 key（`rt_buffer`、`rt_tick`、`rt_threshold`、`rt_last_error`）延續不變；新增：
+
+| Key | 型別 | 說明 | 生命週期 |
+|---|---|---|---|
+| `rt_ws_client` | `RealtimeWsClient` | WS client 實例（`DATA_SOURCE=api` 時初始化）；daemon 執行緒持有 `_buffer` 與 `_lock`，fragment 透過 `.buffer` 屬性讀快照。 | 頁面進入時建立；session 結束 / `stop()` 後執行緒退出 |
+
+> `rt_last_error` 由 `ws.last_error` property 代理（WS client 內部持有），`session_state` 層不再單獨寫入；mock 階段 `rt_last_error` 仍作為預留 key 記錄（見 §session_state 契約）。
+
+---
+
+### 狀態與錯誤處理（接後端）
+
+| 情境 | 呈現 |
+|---|---|
+| 緩衝為空（WS 尚未收到第一筆） | `empty_state("資料串流啟動中…")` 取代圖表（同 mock 首幀，語意一致） |
+| 目前值 > 閾值 | toast overlay + 「目前值」卡 inverse delta（同 mock） |
+| WS ticket 取得失敗（401/503） | `ws.last_error` 設值 → `render_error(ws.last_error)` + `return`（停止 fragment 繼續刷新） |
+| WS 連線中斷 | RealtimeWsClient 自動指數退避重連（1→2→4…≤30 s）；重連中 `ws.buffer` 保留最後已知值，直到 `last_error` 設值才呈現 error |
+| WS 訊息格式異常（parse error） | 該筆跳過（`_on_reading` 捕捉 `ValueError`）；`last_error` 不設值，下一筆正常消費 |
+
+---
+
+### lib/ 依賴（接後端新增）
+
+| 模組 | 用途 |
+|---|---|
+| `lib/realtime_ws.py` | WS client（`RealtimeWsClient`）|
+| `websockets` | async WS 連線（`websockets.connect`）；需加入 `pyproject.toml` |
+| `httpx` | 取 WS ticket（`POST /ws/ticket`）；已為既有相依 |
+
+---
+
+### 可測試性 / TDD（接後端）
+
+> 延伸既有 §可測試性 / TDD；編號接續（18 起）。
+
+#### 純函式 / 單元（`tests/unit/test_realtime_ws.py`）
+
+18. **`_http_to_ws` 轉換**（等效驗算 `config.fastapi_ws_url` 邏輯）：`http://a` → `ws://a`；`https://b` → `wss://b`；`https://` 不會雙重替換為 `wsss://`。
+19. **`_on_reading` 更新緩衝**：建立 client（不呼叫 `start()`），直接呼叫 `_on_reading(r)`，`ws.buffer == [r]`；連續呼叫超過 `MAX_POINTS` → `trim` 生效（`len(ws.buffer) == MAX_POINTS`）。
+20. **`_on_error` 設 `last_error`**：呼叫 `_on_error("bad")` → `ws.last_error == "bad"`；接著 `_on_reading(r)` → `ws.last_error is None`（收到資料時清除錯誤）。
+21. **`stop()` 中斷 backoff**：mock `_connect_and_subscribe` 拋例外；啟動執行緒後立即 `ws.stop()`，確認執行緒於合理時間（< 1 s）退出（不因 backoff wait 掛住）。
+22. **UTC → 本地時區轉換**：`_on_reading` 收到 UTC isoformat ts → `Reading.ts.tzinfo` 為本地時區（`utcoffset()` 等於本機偏移）。
+
+#### 頁面行為（`tests/app/test_realtime_monitor.py`，AppTest，接後端）
+
+> 以 mock `RealtimeWsClient` 注入 `session_state`（`rt_ws_client`）；不啟動真實執行緒，不連真實後端。模式切換以 `monkeypatch` 覆寫 `settings.use_mock = False`（或直接 patch `lib.config.get_settings`）。
+
+23. **WS buffer 渲染**：注入帶 `buffer=[Reading(now, 42.0)]`、`last_error=None` 的 mock ws 至 `rt_ws_client` → fragment 含 `st.metric`（指標卡），不顯示 `st.info`。
+24. **WS 連線失敗呈現**：注入 `last_error="connection refused"` → fragment 含 `render_error` 輸出（`st.error`）、**不含** `st.metric`（提前 return）。
+25. **WS 緩衝為空呈現**：注入 `buffer=[]`、`last_error=None` → 顯示 `empty_state("資料串流啟動中…")`（同 mock 測試 17，語意對齊）。
+
+> 依 `CLAUDE.md`：先寫失敗測試（RED）→ 最小實作（GREEN）→ 全綠後重構。
+> 順序：`lib/realtime_ws.py` unit（18–22）→ config property 單元 → 頁面 AppTest（23–25）。
 </content>
 </invoke>
