@@ -30,7 +30,7 @@ def _edit_dialog(record_id: int) -> None:
     except RecordNotFound:
         st.warning("資料不存在或已被移除")
         if st.button("關閉", key="dm_edit_close"):
-            del st.session_state["dm_edit_id"]
+            st.session_state.pop("dm_edit_id", None)
             st.rerun()
         return
 
@@ -51,7 +51,7 @@ def _edit_dialog(record_id: int) -> None:
                 {"title": title, "value": value, "category": category, "note": note},
                 actor,
             )
-            del st.session_state["dm_edit_id"]
+            st.session_state.pop("dm_edit_id", None)
             st.toast("已更新")
             st.rerun()
         except ValidationError as e:
@@ -65,7 +65,7 @@ def _delete_dialog(record_id: int) -> None:
     except RecordNotFound:
         st.warning("資料不存在或已被移除")
         if st.button("關閉", key="dm_delete_close"):
-            del st.session_state["dm_delete_id"]
+            st.session_state.pop("dm_delete_id", None)
             st.rerun()
         return
 
@@ -73,19 +73,22 @@ def _delete_dialog(record_id: int) -> None:
     col_confirm, col_cancel = st.columns(2)
     if col_confirm.button("確認刪除", type="primary", use_container_width=True):
         ds.delete_record(record_id, actor)
-        del st.session_state["dm_delete_id"]
+        st.session_state.pop("dm_delete_id", None)
         st.toast("已刪除")
         st.rerun()
     if col_cancel.button("取消", use_container_width=True):
-        del st.session_state["dm_delete_id"]
+        st.session_state.pop("dm_delete_id", None)
         st.rerun()
 
 
 # ── trigger 檢查（每次 rerun 最優先執行）────────────────────────
+# 一次性 pop：dialog 開啟後立即清除 key，防止 X 關閉後下次 rerun 重開 dialog。
+# @st.dialog 基於 @st.fragment，dialog 內部互動走 fragment rerun，不過 trigger check，
+# 所以即使 key 消失，dialog 本身仍保持開啟直到使用者明確關閉。
 if "dm_edit_id" in st.session_state:
-    _edit_dialog(st.session_state["dm_edit_id"])
+    _edit_dialog(st.session_state.pop("dm_edit_id"))
 if "dm_delete_id" in st.session_state:
-    _delete_dialog(st.session_state["dm_delete_id"])
+    _delete_dialog(st.session_state.pop("dm_delete_id"))
 
 # ── 頁面主體 ─────────────────────────────────────────────────────
 st.title("資料管理")

@@ -191,16 +191,34 @@ def _first_editable_edit_btn(at: AppTest):
 def test_edit_dialog_updates_title():
     """點「編輯」→ session_state trigger → dialog 顯示，修改標題送出後列表刷新。"""
     at = _open_data_management(Actor("alice", "user"))
-    _first_editable_edit_btn(at).click().run()  # 寫入 dm_edit_id → rerun
+    _first_editable_edit_btn(at).click().run()  # 寫入 dm_edit_id → rerun → trigger pop → dialog 開啟
     assert not at.exception
     # dialog 開啟後有「標題」text_input（key=dm_edit_title 確保不與 create 表單衝突）
     title_input = next(ti for ti in at.text_input if ti.key == "dm_edit_title")
-    title_input.set_value("已修改的標題").run()
+    # AppTest 的每次 .run() 都是 full page rerun（無 fragment rerun），
+    # pop() 後 dm_edit_id 已清除，需在 submit 前手動 re-arm。
+    # （real Streamlit：dialog 作為 fragment 保持開啟，不需 re-arm）
+    title_input.set_value("已修改的標題")  # 僅設值，不 run
+    at.session_state["dm_edit_id"] = 1  # re-arm：種子第 1 筆為 alice 所建
     next(b for b in at.button if b.label == "更新").click().run()
     assert not at.exception
     # 標題欄以 st.write 渲染，出現在 at.markdown
     texts = [m.value for m in at.markdown]
     assert any("已修改的標題" in t for t in texts)
+
+
+def test_edit_dialog_does_not_reopen_on_subsequent_rerun():
+    """開啟 dialog 後再次 rerun（無互動）不應重開 dialog（regression：dm_edit_id 未清除）。"""
+    at = _open_data_management(Actor("alice", "user"))
+    _first_editable_edit_btn(at).click().run()
+    assert not at.exception
+    assert any(ti.key == "dm_edit_title" for ti in at.text_input), "dialog 應已開啟"
+
+    # 不送出，直接再 rerun（模擬點其他按鈕後觸發的 rerun）
+    at.run()
+    assert not at.exception
+    assert not any(ti.key == "dm_edit_title" for ti in at.text_input), \
+        "dialog 不應在下一次 rerun 後重新開啟"
 
 
 # ── 8-6：刪除 dialog ──────────────────────────────────────────────
@@ -215,7 +233,8 @@ def test_delete_dialog_removes_record():
     before = _total_records(at)
     _first_editable_delete_btn(at).click().run()
     assert not at.exception
-    # dialog 有「確認刪除」按鈕
+    # dialog 有「確認刪除」按鈕；AppTest 需 re-arm 使下次 run 重開 dialog
+    at.session_state["dm_delete_id"] = 1  # 種子第 1 筆為 alice 所建
     next(b for b in at.button if b.label == "確認刪除").click().run()
     assert not at.exception
     assert _total_records(at) == before - 1
@@ -226,6 +245,7 @@ def test_delete_cancel_keeps_record():
     at = _open_data_management(Actor("alice", "user"))
     before = _total_records(at)
     _first_editable_delete_btn(at).click().run()
+    at.session_state["dm_delete_id"] = 1  # re-arm
     next(b for b in at.button if b.label == "取消").click().run()
     assert not at.exception
     assert _total_records(at) == before

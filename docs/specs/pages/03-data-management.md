@@ -70,10 +70,13 @@ def _edit_dialog(record_id: int) -> None: ...   # 詳見「編輯」小節
 def _delete_dialog(record_id: int) -> None: ... # 詳見「刪除」小節
 
 # ── trigger 檢查（每次 rerun 最優先執行）────────────────────────
+# pop()：一次性消費，防止 X 關閉後的下次 rerun 重開 dialog。
+# @st.dialog 基於 @st.fragment，dialog 內部互動走 fragment rerun，
+# 不過 trigger check，dialog 仍保持開啟。
 if "dm_edit_id" in st.session_state:
-    _edit_dialog(st.session_state["dm_edit_id"])
+    _edit_dialog(st.session_state.pop("dm_edit_id"))
 if "dm_delete_id" in st.session_state:
-    _delete_dialog(st.session_state["dm_delete_id"])
+    _delete_dialog(st.session_state.pop("dm_delete_id"))
 
 # ── 頁面主體 ─────────────────────────────────────────────────────
 st.title("資料管理")
@@ -192,7 +195,7 @@ with import_tab:
 
 | 規則 | 說明 |
 |---|---|
-| **Dialog trigger pattern** | 按鈕點擊寫入 `st.session_state["dm_edit_id"]`（或 `dm_delete_id`）並 `st.rerun()`；頁面頂端的 trigger 檢查每次 rerun 最先執行，確保 dialog 在 rerun 間保持開啟，且 AppTest 可直接驗證 session_state。 |
+| **Dialog trigger pattern（一次性 pop）** | 按鈕點擊寫入 `st.session_state["dm_edit_id"]`（或 `dm_delete_id`）並 `st.rerun()`；頁面頂端的 trigger 檢查以 **`pop()`** 一次性消費 key 並呼叫 dialog。`@st.dialog` 基於 `@st.fragment`，dialog 內部互動走 **fragment rerun**，不經過 trigger check，dialog 仍保持開啟。當使用者按 X 關閉時，觸發 full page rerun，此時 key 已被消費，不再重開 dialog。**若在 AppTest 測試多步驟 dialog 互動**（如 submit），因 AppTest 無 fragment rerun，需在每次 dialog-required run 前手動 `at.session_state["dm_edit_id"] = record_id` 重新設定。 |
 | **Dialog 函式在 module 頂層** | `@st.dialog` 裝飾的函式只能定義在 module 頂層（非 `with tab:` 內），否則 Streamlit 報錯。 |
 | **ds / actor 取自 module scope** | Dialog 函式不需接收 `ds` / `actor` 參數，直接取 module-level 變數即可。 |
 | **篩選變動才重置頁碼** | 比對 `dm_prev_filter`（`(cat_val, kw_val)` tuple），只在值確實改變時才重置 `dm_page = 1`。 |
@@ -216,8 +219,8 @@ with import_tab:
 | `dm_sort` | `str` | 頁面 selectbox | 排序選項標籤（對應 `_SORT_OPTIONS` key）；改動即時重查；預設 `"ID ↑"` |
 | `dm_size` | `int` | 頁面 selectbox | 每頁筆數（20/50/100）；改動即時重查 |
 | `dm_prev_filter` | `tuple[str, str]` | 頁面 | `(cat_val, kw_val)` 快照，用於偵測變動並重置頁碼 |
-| `dm_edit_id` | `int` | 頁面按鈕 / dialog | Dialog trigger：寫入後 rerun 開啟編輯 dialog；dialog 關閉時刪除 |
-| `dm_delete_id` | `int` | 頁面按鈕 / dialog | Dialog trigger：寫入後 rerun 開啟刪除 dialog；dialog 關閉時刪除 |
+| `dm_edit_id` | `int` | 頁面按鈕 | Dialog trigger：寫入後 rerun 開啟編輯 dialog；trigger check 以 `pop()` 一次性消費，dialog 開啟後 key 即消失（不需在 dialog 內刪除） |
+| `dm_delete_id` | `int` | 頁面按鈕 | Dialog trigger：寫入後 rerun 開啟刪除 dialog；trigger check 以 `pop()` 一次性消費，同上 |
 
 ---
 
@@ -410,7 +413,7 @@ sort = _SORT_OPTIONS[sort_label]   # 傳入 list_records(sort=sort)
 
 ### 編輯(更新)
 
-Dialog 採 **session_state trigger pattern**：按鈕點擊將 `record.id` 寫入 `dm_edit_id` 並 `st.rerun()`；頁面頂端的 trigger 檢查在每次 rerun 最先執行，確保 dialog 在 rerun 間保持開啟且 AppTest 可測。
+Dialog 採 **session_state trigger pattern（一次性 pop）**：按鈕點擊將 `record.id` 寫入 `dm_edit_id` 並 `st.rerun()`；頁面頂端的 trigger 檢查在每次 rerun 最先執行，以 `pop()` 消費 key 後呼叫 dialog。`@st.dialog` 基於 `@st.fragment`，dialog 內部互動（填表、表單送出前的 rerun）走 fragment rerun，不再過 trigger check，dialog 保持開啟；**按 X 關閉**時觸發 full page rerun，key 已消費故不重開。
 
 ```python
 # ── 在 module 頂層定義（非 tab 內部）────────────────────────────
@@ -421,7 +424,7 @@ def _edit_dialog(record_id: int) -> None:
     except RecordNotFound:
         st.warning("資料不存在或已被移除")
         if st.button("關閉", key="dm_edit_close"):
-            del st.session_state["dm_edit_id"]
+            st.session_state.pop("dm_edit_id", None)  # 已被 trigger pop()，safe no-op
             st.rerun()
         return
 
@@ -439,15 +442,15 @@ def _edit_dialog(record_id: int) -> None:
                              {"title": title, "value": value,
                               "category": category, "note": note},
                              actor)
-            del st.session_state["dm_edit_id"]
+            st.session_state.pop("dm_edit_id", None)  # 已被 trigger pop()，safe no-op
             st.toast("已更新")
             st.rerun()
         except ValidationError as e:
             st.error(str(e))
 
-# ── 頁面頂端 trigger 檢查 ─────────────────────────────────────────
+# ── 頁面頂端 trigger 檢查（一次性 pop）────────────────────────────
 if "dm_edit_id" in st.session_state:
-    _edit_dialog(st.session_state["dm_edit_id"])
+    _edit_dialog(st.session_state.pop("dm_edit_id"))
 
 # ── 在列表迴圈中寫入 trigger ──────────────────────────────────────
 if col_edit.button("編輯", key=f"dm_edit_{record.id}", disabled=not editable):
@@ -468,7 +471,7 @@ def _delete_dialog(record_id: int) -> None:
     except RecordNotFound:
         st.warning("資料不存在或已被移除")
         if st.button("關閉", key="dm_delete_close"):
-            del st.session_state["dm_delete_id"]
+            st.session_state.pop("dm_delete_id", None)  # 已被 trigger pop()，safe no-op
             st.rerun()
         return
 
@@ -476,16 +479,16 @@ def _delete_dialog(record_id: int) -> None:
     col_confirm, col_cancel = st.columns(2)
     if col_confirm.button("確認刪除", type="primary", use_container_width=True):
         ds.delete_record(record_id, actor)
-        del st.session_state["dm_delete_id"]
+        st.session_state.pop("dm_delete_id", None)  # 已被 trigger pop()，safe no-op
         st.toast("已刪除")
         st.rerun()
     if col_cancel.button("取消", use_container_width=True):
-        del st.session_state["dm_delete_id"]
+        st.session_state.pop("dm_delete_id", None)  # 已被 trigger pop()，safe no-op
         st.rerun()
 
-# ── 頁面頂端 trigger 檢查 ─────────────────────────────────────────
+# ── 頁面頂端 trigger 檢查（一次性 pop）────────────────────────────
 if "dm_delete_id" in st.session_state:
-    _delete_dialog(st.session_state["dm_delete_id"])
+    _delete_dialog(st.session_state.pop("dm_delete_id"))
 
 # ── 在列表迴圈中寫入 trigger ──────────────────────────────────────
 if col_del.button("刪除", key=f"dm_delete_{record.id}", disabled=not editable):
@@ -662,6 +665,7 @@ records 由**來源端**擁有(mock 記憶體 / 日後後端 API),前端經 `Dat
 | 8-3 | 分頁切換（下一頁/上一頁更新列表） | `tests/app/test_data_management.py` | ✅ 完成 |
 | 8-4 | 新增表單送出後列表刷新、筆數+1 | `tests/app/test_data_management.py` | ✅ 完成 |
 | 8-5 | 編輯彈窗開啟、修改、更新後列表刷新 | `tests/app/test_data_management.py` | ✅ 完成 |
+| 8-5r | **[Regression]** 編輯 dialog 按 X 關閉後再次 rerun 不重開 | `tests/app/test_data_management.py` | ✅ 完成 |
 | 8-6 | 刪除確認彈窗、確認後列表筆數-1 | `tests/app/test_data_management.py` | ✅ 完成 |
 | 8-7 | 匯入分頁渲染（AppTest 不支援 file_uploader，頁面不 crash） | `tests/app/test_data_management.py` | ✅ 完成 |
 | 8-8 | 匯入解析：CSV/JSON 格式、超限拒絕、缺欄拒絕 | `tests/unit/test_import_utils.py` | ✅ 完成 |
