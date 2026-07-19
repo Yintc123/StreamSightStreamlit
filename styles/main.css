@@ -429,8 +429,10 @@ html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem:hover {
     text-decoration: none;
 }
 
-html[data-theme="dark"] .ss-topbar__sysitem--active,
-html[data-theme="dark"] .ss-topbar__sysitem--active:hover {
+/* active tab：需帶 .ss-topbar 祖先拉平特異度 (0,3,1)/(0,4,1)——
+ * active 元素同時掛 sysitem class，否則會被上方 inactive 規則蓋成灰字 */
+html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem--active,
+html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem--active:hover {
     background-color: rgba(34, 211, 238, 0.14);       /* brand-overlay（cyan） */
     color: #22d3ee;                                   /* brand */
 }
