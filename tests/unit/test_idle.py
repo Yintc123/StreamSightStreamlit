@@ -63,6 +63,20 @@ def test_build_idle_js_operates_on_parent_document():
     assert "window.parent" in js
 
 
+def test_build_idle_js_injects_logic_into_parent_document():
+    """導向必須在頂層框架 context 執行：把邏輯以 <script> 注入 parent document。
+
+    component iframe 的 sandbox 缺 allow-top-navigation，若直接在 iframe 內
+    window.parent.location=... 會被瀏覽器封鎖（手動驗證發現）。故改為在 parent
+    document 建 <script> 讓計時器與導向都跑在頂層 context。
+    """
+    js = idle.build_idle_js(900, 30)
+    # bootstrap 需在 parent document 建立並掛載 <script>（在頂層 context 執行）
+    assert "window.parent" in js          # 靠 allow-same-origin 存取 parent
+    assert "createElement('script')" in js
+    assert "appendChild" in js
+
+
 # --- inject_idle_js：Streamlit 接縫（§7 模組表；對齊 theme.inject_theme_js） ---
 
 def test_inject_idle_js_emits_script_with_configured_timeout(monkeypatch):

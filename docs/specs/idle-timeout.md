@@ -66,9 +66,22 @@ Streamlit **每次互動才重跑整個 script**。使用者若完全不動，**
 
 ## 4. 前端 JS 閒置偵測
 
-### 4.1 注入方式
+### 4.1 注入方式（含 iframe sandbox 導向限制與解法）
 
-沿用 [theme-toggle §5](theme-toggle.md) 既有模式，以 `st.components.v1.html(f"<script>{JS}</script>", height=0)` 於 `app.py` 每次 rerun 注入（冪等）。元件跑在 iframe 內，一律透過 `window.parent.document` 操作主文件（與 `inject_theme_js` 相同）。
+沿用 [theme-toggle §5](theme-toggle.md) 既有模式，以 `st.components.v1.html(f"<script>{JS}</script>", height=0)` 於 `app.py` 每次 rerun 注入（冪等）。
+
+> ⚠️ **關鍵限制（手動驗證發現，2026-07-19）**：`components.html` 的 iframe sandbox 為
+> `allow-same-origin allow-scripts …`，但**不含 `allow-top-navigation`**。因此在 iframe 內
+> 直接 `window.parent.location.href = '?logout=1&reason=idle'` 會被瀏覽器**靜默封鎖**
+> （不拋錯、不導向）——計時器有觸發，但頂層框架不會被導向，**自動登出失效**。
+> theme JS 之所以可用，是因為它只做 **DOM 讀寫**（`allow-same-origin` 允許），並未導向。
+>
+> **解法（已採用）**：iframe bootstrap 靠 `allow-same-origin` 存取 parent DOM，
+> 把整段 idle 邏輯（監聽 + 計時器 + 導向）以 `<script>` 節點注入 **parent document**，
+> 使其在**頂層框架 context** 執行——此時 `window.location.href = '?logout=1&reason=idle'`
+> 是「頂層框架導向自身」，不受 iframe sandbox 限制。監聽與 `localStorage`、`__ssIdleCleanup`
+> 也一併掛在頂層 `window`/`document`。詳見 `lib/idle.py` 的 `_IDLE_BOOTSTRAP_TEMPLATE` /
+> `_IDLE_TOP_LOGIC`。
 
 ### 4.2 行為
 
@@ -85,38 +98,52 @@ Streamlit **每次互動才重跑整個 script**。使用者若完全不動，**
 
 JS 內容由 `lib/idle.py::build_idle_js(timeout_seconds, throttle_seconds)` 這支**純函式**產生（不依賴 Streamlit，對齊 `topbar._build_topbar_html` 模式）；`app.py` 只負責注入。
 
-**JS 骨架（示意，非最終碼）**：
+分兩段（見 §4.1）：**bootstrap**（跑在 iframe）只負責把**頂層邏輯**以 `<script>` 注入 parent document；**頂層邏輯**（跑在 top frame）承載計時器/監聽/導向。
+
+**Bootstrap（iframe 內，示意）**：
 
 ```js
 (function () {
-  var W = window.parent, D = W.document;
-  var TIMEOUT_MS = {timeout_ms}, THROTTLE_MS = {throttle_ms};
-  var KEY = 'ss_last_activity';
-  if (W.__ssIdleCleanup) { W.__ssIdleCleanup(); }        // 冪等：清上一輪
+  var P = window.parent, D = P.document;
+  if (P.__ssIdleCleanup) { P.__ssIdleCleanup(); }        // 冪等：清上一輪（含移除舊 script 節點）
+  var s = D.createElement('script');
+  s.id = 'ss-idle-script';
+  s.textContent = <頂層邏輯字串>;   // Python 端以 json.dumps 安全內嵌
+  D.head.appendChild(s);                                 // 掛上即在 top context 執行
+})();
+```
+
+**頂層邏輯（parent document 內執行，`window` 即 top，示意）**：
+
+```js
+(function () {
+  var TIMEOUT_MS = {timeout_ms}, THROTTLE_MS = {throttle_ms}, KEY = 'ss_last_activity';
+  if (window.__ssIdleCleanup) { window.__ssIdleCleanup(); }
 
   var timer = null, last = 0;
   var events = ['mousemove', 'mousedown', 'wheel', 'keydown'];  // 僅滑鼠 / 鍵盤
 
-  function fireLogout() { W.location.href = '?logout=1&reason=idle'; }
-  function schedule() { if (timer) W.clearTimeout(timer); timer = W.setTimeout(fireLogout, TIMEOUT_MS); }
+  function fireLogout() { window.location.href = '?logout=1&reason=idle'; }  // top → 導向可行
+  function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(fireLogout, TIMEOUT_MS); }
   function onActivity() {
     var now = Date.now();
     if (now - last < THROTTLE_MS) return;                // 節流
     last = now;
-    try { W.localStorage.setItem(KEY, String(now)); } catch (e) {}
+    try { localStorage.setItem(KEY, String(now)); } catch (e) {}
     schedule();
   }
   function onStorage(e) { if (e.key === KEY) schedule(); }  // 跨分頁：他頁有活動 → 重置
 
-  events.forEach(function (ev) { D.addEventListener(ev, onActivity, { passive: true }); });
-  W.addEventListener('storage', onStorage);
+  events.forEach(function (ev) { document.addEventListener(ev, onActivity, { passive: true }); });
+  window.addEventListener('storage', onStorage);
   schedule();
 
-  W.__ssIdleCleanup = function () {
-    if (timer) W.clearTimeout(timer);
-    events.forEach(function (ev) { D.removeEventListener(ev, onActivity, { passive: true }); });
-    W.removeEventListener('storage', onStorage);
-    W.__ssIdleCleanup = null;
+  window.__ssIdleCleanup = function () {
+    if (timer) clearTimeout(timer);
+    events.forEach(function (ev) { document.removeEventListener(ev, onActivity, { passive: true }); });
+    window.removeEventListener('storage', onStorage);
+    var el = document.getElementById('ss-idle-script'); if (el) { el.parentNode.removeChild(el); }
+    window.__ssIdleCleanup = null;
   };
 })();
 ```
@@ -272,12 +299,19 @@ inject_idle_js()                    # 於 inject_theme_js 之後，冪等注入
 
 ### 8.3 手動驗證（JS 計時無法以 AppTest 覆蓋）
 
-AppTest 不執行瀏覽器 JS，計時器實際「到點跳轉」與跨分頁同步**無法自動化**（同 auth-flow spike 精神，需親眼驗證）。開發時暫時把 `IDLE_TIMEOUT_SECONDS` 調小（如 10s）本機驗證：
+AppTest 不執行瀏覽器 JS，計時器實際「到點跳轉」與跨分頁同步**無法自動化**（同 auth-flow spike 精神，需親眼驗證）。開發時暫時把 `IDLE_TIMEOUT_SECONDS` 調小（如 3–10s）本機驗證：
 
 - 開啟頁面靜置 → 到點自動導向登入頁 / mock 換回預設角色，且出現「因閒置逾 15 分鐘」提示。
 - 靜置期間動滑鼠 / 按鍵 → 計時器重置，不登出。
 - 兩分頁：A 持續操作、B 靜置 → B 不被踢出（localStorage `storage` 事件同步）。
 - 手動點 TopBar 登出 → **即時**跳轉（無過場頁、不帶 idle 提示），確認 §7.2 手動路徑未被拖慢。
+
+> **已執行（2026-07-19，headless Chromium / Playwright）**：以 `IDLE_TIMEOUT_SECONDS=3`
+> 起 mock 應用實測：①靜置 → framenavigated 捕捉到 `/?logout=1&reason=idle`，且畫面出現
+> 「因閒置逾 15 分鐘，已登出」toast（截圖存證）；②每 0.6s 動滑鼠/按鍵 8s → 無登出導向。
+> **此輪先揪出 §4.1 的 sandbox 導向封鎖 bug（原 iframe 內導向無效）**，改為 parent-context
+> 注入後才通過。註：headless 環境對「跨站」程式化導向有干擾（無外網），同源 `?logout=1`
+> 可正常 commit，故驗證有效。
 
 > **偵測粒度**：活動以 `IDLE_ACTIVITY_THROTTLE_SECONDS`（30s）節流，故實際登出時點相對「最後一次活動」有 ±節流秒數的誤差（15 分 ± 30s），屬預期。
 
