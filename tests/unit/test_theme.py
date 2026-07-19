@@ -38,18 +38,18 @@ def test_parse_theme_light():
 
 
 def test_parse_theme_none():
-    """None（cookie 不存在）→ 收斂到 'dark'（預設值）。"""
-    assert parse_theme(None) == "dark"
+    """None（cookie 不存在）→ 收斂到 'light'（應用程式預設為白天主題）。"""
+    assert parse_theme(None) == "light"
 
 
 def test_parse_theme_unknown():
-    """未知字串（如 'system'）→ 收斂到 'dark'。"""
-    assert parse_theme("system") == "dark"
+    """未知字串（如 'system'）→ 收斂到 'light'。"""
+    assert parse_theme("system") == "light"
 
 
 def test_parse_theme_empty():
-    """空字串 → 收斂到 'dark'。"""
-    assert parse_theme("") == "dark"
+    """空字串 → 收斂到 'light'。"""
+    assert parse_theme("") == "light"
 
 
 # ── build_theme_cookie_string ─────────────────────────────────────────────────

@@ -21,22 +21,9 @@ _THEME_JS = r"""
   var par = window.parent;
   var pdoc = par.document;
 
-  var SUN_INNER = [
-    '<circle cx="12" cy="12" r="5"/>',
-    '<line x1="12" y1="1" x2="12" y2="3"/>',
-    '<line x1="12" y1="21" x2="12" y2="23"/>',
-    '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>',
-    '<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>',
-    '<line x1="1" y1="12" x2="3" y2="12"/>',
-    '<line x1="21" y1="12" x2="23" y2="12"/>',
-    '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>',
-    '<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'
-  ].join('');
-  var MOON_INNER = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
-
   function readCookie() {
     var m = pdoc.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
-    return m && (m[1] === 'light' || m[1] === 'dark') ? m[1] : 'dark';
+    return m && (m[1] === 'light' || m[1] === 'dark') ? m[1] : 'light';
   }
 
   function applyTheme(t) {
@@ -48,30 +35,26 @@ _THEME_JS = r"""
     pdoc.documentElement.setAttribute('data-theme-ready', '');
   }
 
-  function syncButton(t) {
-    var btn = pdoc.querySelector('.ss-topbar__theme-btn');
-    if (!btn) return;
-    var isLight = t === 'light';
-    btn.setAttribute('aria-pressed', String(isLight));
-    btn.setAttribute('aria-label', isLight ? '切換為深色' : '切換為淺色');
-    var svg = btn.querySelector('svg');
-    if (svg) svg.innerHTML = isLight ? SUN_INNER : MOON_INNER;
+  function syncSwitch(t) {
+    var sw = pdoc.querySelector('.ss-topbar__theme-switch');
+    if (!sw) return;
+    sw.setAttribute('aria-checked', t === 'dark' ? 'true' : 'false');
   }
 
   var initial = readCookie();
   applyTheme(initial);
-  syncButton(initial);
+  syncSwitch(initial);
   enableTransition();
 
   if (!par.__ssThemeReady) {
     par.__ssThemeReady = true;
     pdoc.addEventListener('click', function (e) {
-      var btn = e.target.closest('.ss-topbar__theme-btn');
-      if (!btn) return;
-      var current = pdoc.documentElement.dataset.theme || 'dark';
-      var next = current === 'dark' ? 'light' : 'dark';
+      var sw = e.target.closest('.ss-topbar__theme-switch');
+      if (!sw) return;
+      var current = pdoc.documentElement.dataset.theme || 'light';
+      var next = current === 'light' ? 'dark' : 'light';
       applyTheme(next);
-      syncButton(next);
+      syncSwitch(next);
     });
   }
 })();
@@ -85,8 +68,8 @@ def load_css(path: str = "styles/main.css") -> None:
 
 
 def parse_theme(raw: "str | None") -> str:
-    """未知 / 缺省值收斂到 'dark'（對齊 Frontend parseTheme）。"""
-    return raw if raw in ("light", "dark") else "dark"
+    """未知 / 缺省值收斂到 'light'（應用程式預設白天主題）。"""
+    return raw if raw in ("light", "dark") else "light"
 
 
 def build_theme_cookie_string(theme: str, is_prod: bool = False) -> str:
@@ -96,9 +79,9 @@ def build_theme_cookie_string(theme: str, is_prod: bool = False) -> str:
 
 
 def init_theme_state() -> None:
-    """session_state['theme'] 初始化（首次 session 設預設值 'dark'）。"""
+    """session_state['theme'] 初始化（首次 session 設預設值 'light'）。"""
     if "theme" not in st.session_state:
-        st.session_state["theme"] = "dark"
+        st.session_state["theme"] = "light"
 
 
 def inject_theme_js() -> None:

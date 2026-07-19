@@ -175,27 +175,41 @@
     white-space: nowrap;
 }
 
-/* ThemeToggle：w-9(36px) h-9(36px) rounded-md(6px)
-   text-ink-AA hover:text-ink-AAA hover:bg-line */
-.ss-topbar__theme-btn {
+/* ThemeToggle 開關（role=switch）：pill 形軌道 36×20px
+ * OFF = aria-checked=false = 白天主題（中性灰軌道）
+ * ON  = aria-checked=true  = 夜間主題（品牌色軌道） */
+.ss-topbar__theme-switch {
+    position: relative;
     width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(15, 23, 42, 0.66);  /* ink-AA */
-    background: transparent;
+    height: 20px;
+    border-radius: 10px;
+    background-color: rgba(15, 23, 42, 0.20);  /* 中性灰軌道 OFF */
     border: none;
+    padding: 0;
     cursor: pointer;
     flex-shrink: 0;
-    transition: color 150ms ease, background-color 150ms ease;
+    transition: background-color 150ms ease;
 }
 
-.ss-topbar__theme-btn:hover {
-    color: #0f172a;                          /* ink-AAA */
-    background-color: rgba(15, 23, 42, 0.12); /* line / bg-line */
+.ss-topbar__theme-switch[aria-checked="true"] {
+    background-color: #2563eb;                 /* brand ON（light context） */
+}
+
+/* 拇指：16px 白色圓形，left:2px 為 OFF，translateX(16px) 為 ON */
+.ss-topbar__theme-switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    pointer-events: none;
+    transition: transform 150ms ease;
+}
+
+.ss-topbar__theme-switch[aria-checked="true"] .ss-topbar__theme-switch-thumb {
+    transform: translateX(16px);
 }
 
 /* ── TopBar 佔位補償 ─────────────────────────────────────────
@@ -421,13 +435,14 @@ html[data-theme="dark"] .ss-topbar__username {
     color: rgba(230, 237, 246, 0.45);                 /* ink-A */
 }
 
-html[data-theme="dark"] .ss-topbar__theme-btn {
-    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+/* 深色上下文中，開關 ON（dark mode）→ 品牌 cyan */
+html[data-theme="dark"] .ss-topbar__theme-switch[aria-checked="true"] {
+    background-color: #22d3ee;                        /* brand（cyan） */
 }
 
-html[data-theme="dark"] .ss-topbar__theme-btn:hover {
-    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
-    background-color: rgba(230, 237, 246, 0.12);      /* line */
+/* 深色上下文中，開關 OFF（不正常狀態）→ 深色中性軌道 */
+html[data-theme="dark"] .ss-topbar__theme-switch {
+    background-color: rgba(230, 237, 246, 0.20);
 }
 
 /* 側欄收合後展開按鈕：light 用 #f1f5f9 底，dark 用 surface-card（對齊 CmsSideNav bg） */

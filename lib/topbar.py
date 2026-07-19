@@ -1,7 +1,7 @@
 """TopBar：對齊 StreamSightFrontend CmsTopBar（h-12 bg-surface-card border-b border-line px-4）。
 
-品牌 + 系統切換 Nav（管理後台 / 資料平台）+ 右側（username、ThemeToggle、登出）。
-ThemeToggle SVG 對齊 ThemeToggle.tsx：dark → MoonPaths；light → SunPaths（circle r=5 + 8 line）。
+品牌 + 系統切換 Nav（管理後台 / 資料平台）+ 右側（username、ThemeToggle 開關、登出）。
+ThemeToggle 採 role=switch 開關模式：OFF = light（白天），ON = dark（夜間）。
 """
 from __future__ import annotations
 
@@ -11,37 +11,21 @@ import streamlit as st
 
 from lib.models import Actor
 
-_SUN_SVG = """\
-<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" \
-fill="none" stroke="currentColor" stroke-width="2" \
-stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">\
-<circle cx="12" cy="12" r="5"/>\
-<line x1="12" y1="1" x2="12" y2="3"/>\
-<line x1="12" y1="21" x2="12" y2="23"/>\
-<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>\
-<line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>\
-<line x1="1" y1="12" x2="3" y2="12"/>\
-<line x1="21" y1="12" x2="23" y2="12"/>\
-<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>\
-<line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>\
-</svg>"""
-
-_MOON_SVG = """\
-<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" \
-fill="none" stroke="currentColor" stroke-width="2" \
-stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">\
-<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>\
-</svg>"""
+# ThemeToggle 開關 thumb（純 CSS 定位，不含 SVG）
+_THEME_SWITCH = (
+    '<button class="ss-topbar__theme-switch" type="button" role="switch" '
+    '{aria_checked} aria-label="深色模式">'
+    '<span class="ss-topbar__theme-switch-thumb"></span>'
+    '</button>'
+)
 
 
-def _build_topbar_html(actor: Actor, cms_base_url: str = "", theme: str = "dark") -> str:
+def _build_topbar_html(actor: Actor, cms_base_url: str = "", theme: str = "light") -> str:
     """純函式：產生 TopBar HTML 字串（不依賴 Streamlit，可單元測試）。"""
     cms_href = cms_base_url if cms_base_url else "#"
     username = _html.escape(actor.username) if actor else ""
-    is_light = theme == "light"
-    svg = _SUN_SVG if is_light else _MOON_SVG
-    aria_pressed = "true" if is_light else "false"
-    aria_label = "切換為深色" if is_light else "切換為淺色"
+    aria_checked = 'aria-checked="true"' if theme == "dark" else 'aria-checked="false"'
+    theme_switch = _THEME_SWITCH.format(aria_checked=aria_checked)
 
     return (
         '<div class="ss-topbar">'
@@ -53,16 +37,14 @@ def _build_topbar_html(actor: Actor, cms_base_url: str = "", theme: str = "dark"
         "</nav>"
         '<div class="ss-topbar__right">'
         f'<span class="ss-topbar__username">{username}</span>'
-        f'<button class="ss-topbar__theme-btn" type="button" '
-        f'aria-pressed="{aria_pressed}" aria-label="{aria_label}">'
-        f"{svg}</button>"
+        f"{theme_switch}"
         '<button class="ss-topbar__sysitem" type="button">登出</button>'
         "</div>"
         "</div>"
     )
 
 
-def render_topbar(actor: Actor, cms_base_url: str = "", theme: str = "dark") -> None:
+def render_topbar(actor: Actor, cms_base_url: str = "", theme: str = "light") -> None:
     """TopBar 注入頁面頂端（position:fixed；CSS 佔位補償見 styles/main.css）。
 
     使用 st.markdown(unsafe_allow_html=True) 以便 AppTest 可驗證渲染結果。
