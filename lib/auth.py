@@ -68,10 +68,10 @@ def require_auth() -> None:
         return
     if state.get_actor() is not None:
         return
-    _s = get_settings()
-    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    # 重導 URL 用 bff_login_url(public base):docker 下 bff_base_url 是
+    # 內部主機名,瀏覽器解析不了(見 config.bff_public_base_url)。
     st.markdown(
-        f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+        f'<meta http-equiv="refresh" content="0; url={get_settings().bff_login_url}">',
         unsafe_allow_html=True,
     )
     st.stop()

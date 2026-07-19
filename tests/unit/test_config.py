@@ -229,6 +229,48 @@ def test_enable_theme_toggle_can_be_set_true(monkeypatch):
     assert s.enable_theme_toggle is True
 
 
+# --- bff_public_base_url:瀏覽器導向用 base URL（docker 內部/對外分離） ---
+
+def test_bff_public_base_url_defaults_to_bff_base_url(monkeypatch):
+    """未設 BFF_PUBLIC_BASE_URL → 回退 bff_base_url（本機開發兩者相同）。"""
+    monkeypatch.setenv("BFF_BASE_URL", "http://frontend:3000")
+    s = get_settings()
+    assert s.bff_public_base_url == "http://frontend:3000"
+
+
+def test_bff_public_base_url_override(monkeypatch):
+    """docker compose 下 BFF_BASE_URL 為內部主機名，BFF_PUBLIC_BASE_URL 為瀏覽器可達位址。"""
+    monkeypatch.setenv("BFF_BASE_URL", "http://frontend:3000")
+    monkeypatch.setenv("BFF_PUBLIC_BASE_URL", "http://localhost:3000")
+    s = get_settings()
+    assert s.bff_public_base_url == "http://localhost:3000"
+    assert s.bff_base_url == "http://frontend:3000"  # 內部呼叫用值不受影響
+
+
+def test_bff_login_url_uses_public_base(monkeypatch):
+    """登入重導 URL 必須以 public base 組成（瀏覽器要跳轉的位址）。"""
+    monkeypatch.setenv("BFF_BASE_URL", "http://frontend:3000")
+    monkeypatch.setenv("BFF_PUBLIC_BASE_URL", "http://localhost:3000")
+    s = get_settings()
+    assert s.bff_login_url == "http://localhost:3000/login"
+
+
+def test_bff_cms_url_uses_public_base(monkeypatch):
+    """TopBar 品牌 / 管理後台連結必須以 public base 組成。"""
+    monkeypatch.setenv("BFF_BASE_URL", "http://frontend:3000")
+    monkeypatch.setenv("BFF_PUBLIC_BASE_URL", "http://localhost:3000")
+    s = get_settings()
+    assert s.bff_cms_url == "http://localhost:3000/cms"
+
+
+def test_bff_public_base_url_empty_string_falls_back(monkeypatch):
+    """BFF_PUBLIC_BASE_URL= 空字串視為未設 → 回退 bff_base_url（§5.6）。"""
+    monkeypatch.setenv("BFF_BASE_URL", "http://frontend:3000")
+    monkeypatch.setenv("BFF_PUBLIC_BASE_URL", "")
+    s = get_settings()
+    assert s.bff_public_base_url == "http://frontend:3000"
+
+
 # --- fastapi_ws_url property（config §2） ---
 
 def test_fastapi_ws_url_http(monkeypatch):

@@ -276,6 +276,19 @@ def test_require_auth_bff_without_actor_redirects_and_stops(bff_mode, fake_sessi
     assert any("refresh" in h for h in redirected)
 
 
+def test_require_auth_redirects_to_public_base_url(bff_mode, fake_session, monkeypatch):
+    """docker 下 bff_base_url 是內部主機名（frontend:3000）；
+    重導 URL 必須用瀏覽器可達的 BFF_PUBLIC_BASE_URL，否則跳到打不開的頁面。"""
+    monkeypatch.setenv("BFF_BASE_URL", "http://frontend:3000")
+    monkeypatch.setenv("BFF_PUBLIC_BASE_URL", "http://localhost:3000")
+    redirected = []
+    monkeypatch.setattr(st, "markdown", lambda html, **k: redirected.append(html))
+    monkeypatch.setattr(st, "stop", lambda: None)
+    auth.require_auth()
+    assert any("http://localhost:3000/login" in h for h in redirected)
+    assert not any("frontend:3000" in h for h in redirected)
+
+
 def test_require_auth_mock_always_passes(fake_session, monkeypatch):
     """mock 模式一律通過（actor 可能不在 session，但 mock 不需要 BFF 驗證）。"""
     stopped = []

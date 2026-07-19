@@ -42,6 +42,11 @@ class BaseAppSettings(BaseSettings):
 
     # BFF(introspection 目標)/ FastAPI(業務 API 目標)base URL(§3.3、§3.4)
     bff_base_url: str = "http://localhost:3000"
+    # 瀏覽器可達的 BFF base URL:登入重導 meta refresh 與 TopBar 連結用。
+    # docker compose 下 bff_base_url 是內部主機名(http://frontend:3000),
+    # 瀏覽器解析不了;此值須設為對外位址(如 http://localhost:3000)。
+    # 未設(空)→ 回退 bff_base_url(本機開發兩者相同)。
+    bff_public_base_url: str = ""
     fastapi_base_url: str = "http://localhost:3001"
     session_cookie_name: str = "streamsight_session"  # 必與前端一致
     bff_session_path: str = "/api/auth/session"  # introspection 端點
@@ -67,6 +72,16 @@ class BaseAppSettings(BaseSettings):
     introspection_cache_ttl_seconds: int = 30
 
     @property
+    def bff_login_url(self) -> str:
+        """瀏覽器要跳轉的登入頁完整 URL(public base + login path)。"""
+        return f"{self.bff_public_base_url}{self.bff_login_path}"
+
+    @property
+    def bff_cms_url(self) -> str:
+        """TopBar 品牌 / 管理後台連結目標(public base + cms path)。"""
+        return f"{self.bff_public_base_url}{self.bff_cms_path}"
+
+    @property
     def fastapi_ws_url(self) -> str:
         """http(s) → ws(s)；先換 https，再換 http，避免 https 雙重替換。"""
         return (
@@ -76,11 +91,19 @@ class BaseAppSettings(BaseSettings):
         )
 
     @model_validator(mode="after")
+    def _fill_public_base_url(self) -> "BaseAppSettings":
+        # bff_public_base_url 未設 → 回退 bff_base_url(本機開發兩者相同)。
+        if not self.bff_public_base_url:
+            self.bff_public_base_url = self.bff_base_url
+        return self
+
+    @model_validator(mode="after")
     def _check_prod_guards(self) -> "BaseAppSettings":
         # §5.3:stage / production 的 base URL 必須 HTTPS 且非 localhost。
         if self.app_env in (AppEnv.STAGE, AppEnv.PRODUCTION):
             for name, url in (
                 ("BFF_BASE_URL", self.bff_base_url),
+                ("BFF_PUBLIC_BASE_URL", self.bff_public_base_url),
                 ("FASTAPI_BASE_URL", self.fastapi_base_url),
             ):
                 if not url.startswith("https://"):

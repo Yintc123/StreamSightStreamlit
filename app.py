@@ -20,14 +20,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )  # ① 頁面設定(必須最先)
 load_css()          # ② 載入一次 CSS
-init_theme_state()  # ②′ 主題 session_state 初始化（dark 預設，見 theme-toggle.md §8）
+init_theme_state()  # ②′ 主題 session_state 初始化（light 預設，見 theme-toggle.md §5.1）
 init_logging()      # ②″ 結構化 log 管線（冪等，掛 request-id filter）
 
 actor = resolve_actor()  # ③ 身分解析(mock/bff 單一出口)
 
 if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.js 登入頁
-    _s = get_settings()
-    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    # 重導 / TopBar 連結一律用 bff_public_base_url 組 URL(瀏覽器可達);
+    # bff_base_url 只給 server-side BFF 呼叫(docker 下為內部主機名)。
+    _login_url = get_settings().bff_login_url
     st.markdown(
         f'<meta http-equiv="refresh" content="0; url={_login_url}">',
         unsafe_allow_html=True,
@@ -43,7 +44,7 @@ if st.query_params.get("logout") == "1":
         st.query_params.clear()  # mock 無登入頁:清 param 後 rerun 以預設角色重進
         st.rerun()
     else:
-        _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+        _login_url = _s.bff_login_url
         st.markdown(
             f'<meta http-equiv="refresh" content="0; url={_login_url}">',
             unsafe_allow_html=True,
@@ -53,8 +54,7 @@ if st.query_params.get("logout") == "1":
 if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
-_s2 = get_settings()
-_cms_url = f"{_s2.bff_base_url}{_s2.bff_cms_path}"
+_cms_url = get_settings().bff_cms_url
 render_topbar(actor, cms_base_url=_cms_url, theme=st.session_state["theme"])  # ⑥ 自訂頂列
 inject_theme_js()  # ⑦ 注入 ThemeToggle JS（冪等；在 topbar DOM 後執行）
 
@@ -64,8 +64,7 @@ try:
 except NotAuthenticated:
     # session 失效(401×2)：清狀態 + 重導登入（error-handling §3、auth §5）
     clear_auth()
-    _s = get_settings()
-    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    _login_url = get_settings().bff_login_url
     st.markdown(
         f'<meta http-equiv="refresh" content="0; url={_login_url}">',
         unsafe_allow_html=True,
