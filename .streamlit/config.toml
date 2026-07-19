@@ -1,11 +1,12 @@
-# 伺服器設定
-# 修正 Windows 11 + Docker Desktop 下檔案上傳失敗:
+# 修正 Docker 下檔案上傳失敗:
 #   "Cannot request file URLs ... isServerConnected:true, isSessionInfoSet:false"
-# 成因:WebSocket 握手成功但初始 NewSession 訊框在 Docker Desktop 網路轉發下
-#       被截斷,前端收不到 SessionInfo,檔案上傳元件拿不到 session。
-# 註:非 CORS/XSRF 問題——頁面與 /_stcore/* 端點同源(皆 localhost:8501)。
-[server]
-enableWebsocketCompression = false
+# 成因:容器內 appuser 家目錄為 /nonexistent(adduser --system 預設),
+#       gatherUsageStats 開啟時 Streamlit 產生 NewSession 訊息會寫
+#       ~/.streamlit/machine_id_v4 → PermissionError → NewSession 從未送達前端
+#       → session 建不起來 → 上傳元件拒發請求(與 OS / 網路 / CORS 無關)。
+# 關閉使用統計即完全跳過該寫檔(metrics_util._get_machine_id_v4 早退)。
+[browser]
+gatherUsageStats = false
 
 # 主題設定(見 docs/specs/design-system.md 設計 Token)
 [theme]

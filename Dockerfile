@@ -13,8 +13,10 @@ RUN uv sync --frozen --no-dev
 FROM python:3.13-slim AS runtime
 WORKDIR /app
 
+# --home:--system 預設家目錄為 /nonexistent(不可寫),Streamlit 寫 ~/.streamlit
+#        會 PermissionError,NewSession 送不出 → 前端 session 建不起來、無法上傳
 RUN addgroup --system --gid 1001 appgroup && \
-    adduser --system --uid 1001 --ingroup appgroup appuser
+    adduser --system --uid 1001 --ingroup appgroup --home /home/appuser appuser
 
 COPY --from=deps /app/.venv /app/.venv
 COPY --chown=appuser:appgroup . .
