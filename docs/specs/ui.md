@@ -16,6 +16,7 @@
 | `metric_cards(metrics)` | 即時監控、分析、Admin | `None` | `st.columns + st.metric` 指標卡列 |
 | `pagination_controls(total, size, key_prefix)` | 資料管理、Admin | `int`（當前頁碼） | 上/下頁按鈕 + 頁碼 caption |
 | `empty_state(message)` | 全部頁面 | `None` | 查無資料時的 `st.info` 標準佔位 |
+| `page_shell(name)` | 路由層（`app.py`） | `DeltaGenerator`（容器） | 每頁最外層穩定容器（帶頁面專屬 key），防跨頁殘影 |
 
 ---
 
@@ -176,6 +177,30 @@ def empty_state(message: str = "目前沒有符合條件的資料") -> None:
 
 ---
 
+## 6.1 `page_shell` — 每頁最外層穩定容器（防跨頁殘影）
+
+### 簽章
+
+```python
+def page_shell(name: str) -> DeltaGenerator:
+    return st.container(key=f"page-{name}")
+```
+
+### 動機：跨頁殘影（ghosting）
+
+Streamlit 前端**不是「切頁＝整頁清空重繪」**，而是對 element tree 做「**位置＋型別**」的增量 diff：同位置、同型別的 element 會被**就地重用**，且**整輪 script 跑完後**才修剪掉本輪未再產生的尾端 element。因此切頁時，前一頁的 widget 會**短暫殘留**在新頁畫面上，直到新頁在同位置產生元件覆蓋、或整輪跑完被修剪。
+
+當新頁**未跑完整棵樹**（`require_auth()` 的 `st.stop()`、未捕捉例外、慢查詢期間的 rerun、同位置 `columns`/`tabs` 欄數不一致）時，殘留會**持續**而非一閃即逝——即「某頁元件跑到別頁」的現象。
+
+### 行為
+
+- 回傳 `st.container(key=f"page-{name}")`；由**路由層**（`app.py` §3 步驟 ⑧）以 `with page_shell(nav.title): nav.run()` 包住整頁輸出。
+- 帶頁面專屬 `key` → 該容器 `proto.id` 編入 `page-<name>`，具**穩定且唯一的 element 身分**；切頁時 `key` 不同 → 前端整塊 **remount 取代**而非同位置重用，殘影消除。
+- `name` 採 `nav.title`（每頁唯一且非空；預設頁 `url_path` 為 `''`，故不採 url_path）。
+- 純薄包裝，不做任何邏輯；集中於路由層一處，各 `pages/` 無需自行包裝。
+
+---
+
 ## 7. 狀態命名規範
 
 所有使用 `session_state` 的元件以 `{key_prefix}_` 為 namespace，避免跨頁污染：
@@ -220,6 +245,8 @@ def empty_state(message: str = "目前沒有符合條件的資料") -> None:
 | 15 | `filter_bar(show_keyword=False, ...)` | 頁面無對應 text_input |
 | 16 | 兩組不同 `key_prefix` 的 `filter_bar` 共存 | 設定 prefix-A 的 category → 讀取 prefix-B 的 `session_state["{prefix_b}_category"]`，值仍為初始值 `"全部"`（各自 namespace 獨立） |
 | 17 | `filter_bar` 篩選值改變後 `pagination_controls` 頁碼重置 | 先停在第 2 頁，改變分類後 `session_state["{prefix}_page"]` 回到 `1` |
+| 18 | `page_shell("analytics")` 容器身分 | element tree 中存在 `proto.id` 結尾為 `page-analytics` 的容器，內容嵌於其中 |
+| 19 | `page_shell` 不同頁名身分互異 | `page_shell("analytics")` 與 `page_shell("data_management")` 產生不同容器 id（同位置不同身分＝殘影反例） |
 
 ---
 

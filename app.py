@@ -14,6 +14,7 @@ from lib.request_id import init_logging
 from lib.state import clear_auth, pop_logout_reason, set_logout_reason
 from lib.theme import inject_theme_js, init_theme_state, load_css
 from lib.topbar import render_topbar
+from lib.ui import page_shell
 
 st.set_page_config(
     page_title="StreamSight",
@@ -85,7 +86,11 @@ idle.inject_idle_js()  # ⑦′ 注入閒置計時器 JS（冪等；純 client-s
 
 try:
     pages = build_pages(actor)  # ⑦ 依 actor.grade 動態組頁清單(見 §5)
-    st.navigation(pages).run()  # ⑧ 交給 Streamlit 路由
+    nav = st.navigation(pages)
+    # ⑧ 路由：以當前頁 title 為 key 包一層穩定容器，讓每頁有唯一 element 身分，
+    #    切頁時整塊 remount 取代而非同位置重用，消除跨頁殘影（見 ui.md page_shell）。
+    with page_shell(nav.title):
+        nav.run()
 except NotAuthenticated:
     # session 失效(401×2)：清狀態 + 重導登入（error-handling §3、auth §5）
     clear_auth()

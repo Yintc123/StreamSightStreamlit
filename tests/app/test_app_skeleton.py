@@ -3,12 +3,32 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from lib.models import Actor, AdminRole
 
 # repo root 的 app.py(AppTest.from_file 以呼叫端檔案目錄為基準,故用絕對路徑)
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
+
+
+def _iter_blocks(node):
+    """遞迴走訪 AppTest element tree 的所有子節點。"""
+    kids = node.children
+    if isinstance(kids, dict):
+        kids = list(kids.values())
+    for c in (kids or []):
+        yield c
+        if hasattr(c, "children"):
+            yield from _iter_blocks(c)
+
+
+def _block_ids(at):
+    """element tree 中所有帶 proto.id 的容器 id 清單。"""
+    return [
+        getattr(getattr(b, "proto", None), "id", "") or ""
+        for b in _iter_blocks(at.main)
+    ]
 
 
 def test_app_runs_and_defaults_to_data_management():
@@ -19,6 +39,49 @@ def test_app_runs_and_defaults_to_data_management():
     titles = [t.value for t in at.title]
     assert "資料管理" in titles
     assert "儀表板" not in titles
+
+
+def test_routed_page_wrapped_in_per_page_container():
+    """路由層以當前頁 title 為 key 包一層穩定容器 → 頁身分編入 element id，
+    切頁時整塊 remount 取代而非同位置重用，消除跨頁殘影（ghosting）。
+    (app-skeleton §3 步驟 ⑧、docs/specs/ui.md page_shell)"""
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not at.exception
+    assert any("page-資料管理" in i for i in _block_ids(at))  # 預設落地頁被包住
+
+
+@pytest.mark.parametrize(
+    "page_path, title",
+    [
+        ("pages/data_management.py", "資料管理"),
+        ("pages/realtime_monitor.py", "即時監控"),
+        ("pages/analytics.py", "資料分析"),
+        ("pages/system_management.py", "系統管理"),
+    ],
+)
+def test_every_page_wrapped_in_per_page_container(page_path, title):
+    """全部 4 頁皆經路由層 page_shell 包住（單點修正涵蓋所有頁）：切到各頁後
+    element tree 含 page-<title> 容器身分。防殘影對每一頁一致生效。"""
+    at = AppTest.from_file(APP_PATH)
+    at.session_state["actor"] = Actor("admin", "admin", grade=AdminRole.SUPER_ADMIN)
+    at.run()
+    at.switch_page(page_path)
+    at.run()
+    assert not at.exception
+    assert any(f"page-{title}" in i for i in _block_ids(at))
+
+
+def test_routed_page_container_changes_on_switch():
+    """切到資料分析頁：容器身分改為 page-資料分析，舊頁容器不再存在。"""
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    at.switch_page("pages/analytics.py")
+    at.run()
+    assert not at.exception
+    ids = _block_ids(at)
+    assert any("page-資料分析" in i for i in ids)
+    assert not any("page-資料管理" in i for i in ids)
 
 
 def test_super_admin_can_open_admin_page():

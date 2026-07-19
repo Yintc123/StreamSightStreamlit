@@ -6,6 +6,62 @@ from streamlit.testing.v1 import AppTest
 from lib.ui import Metric
 
 
+def _iter_blocks(node):
+    """遞迴走訪 AppTest element tree 的所有子節點（供檢查容器 proto.id）。"""
+    kids = node.children
+    if isinstance(kids, dict):
+        kids = list(kids.values())
+    for c in (kids or []):
+        yield c
+        if hasattr(c, "children"):
+            yield from _iter_blocks(c)
+
+
+def _block_ids(at):
+    """回傳 element tree 中所有帶 proto.id 的容器 id 清單。"""
+    return [
+        getattr(getattr(b, "proto", None), "id", "") or ""
+        for b in _iter_blocks(at.main)
+    ]
+
+
+# ---------------------------------------------------------------------------
+# page_shell：每頁最外層穩定容器（防跨頁殘影 / ghosting）
+#
+# 殘影根因：Streamlit 前端對 element tree 做「位置 + 型別」的增量 diff，
+# 切頁時同位置、同型別的舊 element 會被就地重用/暫留，直到整輪跑完才修剪。
+# 修法：每頁最外層包一個帶「頁面專屬 key」的容器，讓該區塊有穩定且唯一的
+# element 身分（proto.id 編入 page-<name>）；切頁時 key 不同 → 整塊 remount
+# 取代而非同位置重用，藉此消除殘影。見 docs/specs/ui.md、app-skeleton.md。
+# ---------------------------------------------------------------------------
+
+def test_page_shell_gives_page_scoped_container_identity():
+    """page_shell(name) 產生的容器 element id 應編入 page-<name>，內容嵌於其中。"""
+    at = AppTest.from_string(
+        "import streamlit as st\n"
+        "from lib.ui import page_shell\n"
+        "with page_shell('analytics'):\n"
+        "    st.title('資料分析')\n"
+    ).run()
+    assert not at.exception
+    assert any(i.endswith("page-analytics") for i in _block_ids(at))
+    assert at.title[0].value == "資料分析"  # 內容確實渲染在容器內
+
+
+def test_page_shell_distinct_pages_get_distinct_identities():
+    """不同頁名 → 不同容器 id（同位置卻不同身分＝殘影根因的反例）。"""
+    def _page_id(name):
+        at = AppTest.from_string(
+            "import streamlit as st\n"
+            "from lib.ui import page_shell\n"
+            f"with page_shell({name!r}):\n"
+            "    st.title('x')\n"
+        ).run()
+        return next(i for i in _block_ids(at) if i.endswith(f"page-{name}"))
+
+    assert _page_id("analytics") != _page_id("data_management")
+
+
 # ---------------------------------------------------------------------------
 # Phase 3: empty_state (#7)
 # ---------------------------------------------------------------------------

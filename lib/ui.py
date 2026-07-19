@@ -69,6 +69,18 @@ def default_date_range(today: date, days: int) -> Tuple[date, date]:
 # UI 元件（薄 Streamlit 包裝）
 # ---------------------------------------------------------------------------
 
+def page_shell(name: str) -> "st.delta_generator.DeltaGenerator":
+    """回傳每頁最外層的穩定容器（帶「頁面專屬 key」），供路由層 `with` 包住整頁輸出。
+
+    防跨頁殘影（ghosting）：Streamlit 前端對 element tree 做「位置＋型別」的增量
+    diff，切頁時同位置、同型別的舊 element 會被就地重用/暫留，直到整輪跑完才修剪，
+    使前一頁元件短暫殘留在新頁。給容器一個頁面專屬 key，會讓該區塊有穩定且唯一的
+    element 身分（proto.id 編入 `page-<name>`）；切頁時 key 不同 → 整塊 remount
+    取代而非同位置重用，藉此消除殘影。見 docs/specs/ui.md、docs/specs/app-skeleton.md。
+    """
+    return st.container(key=f"page-{name}")
+
+
 def empty_state(message: str = "目前沒有符合條件的資料") -> None:
     """各頁無資料時的一致呈現。"""
     st.info(message)
