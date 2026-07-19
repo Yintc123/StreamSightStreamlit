@@ -76,3 +76,21 @@ def parse_json_bytes(content: bytes) -> Tuple[List[dict], Optional[str]]:
             "note": str(item.get("note", "")).strip(),
         })
     return result, None
+
+
+def summarize_import(result) -> Tuple[str, str, Optional[str]]:
+    """ImportResult → (level, message, detail) 顯示三元組（純函式）。
+
+    - 全成功：("success", "匯入完成：成功 N 筆。", None)
+    - 有錯誤列：("warning", "…成功 N 筆，錯誤 M 筆…", "錯誤列：…（1-based，只列前 5 列）")
+    """
+    if not result.errors:
+        return "success", f"匯入完成：成功 **{result.created}** 筆。", None
+    message = (
+        f"匯入完成：成功 **{result.created}** 筆，"
+        f"錯誤 **{len(result.errors)}** 筆（錯誤列未建立）。"
+    )
+    detail = "錯誤列：" + ", ".join(
+        str(e.row_index + 1) for e in result.errors[:5]
+    ) + ("…" if len(result.errors) > 5 else "")
+    return "warning", message, detail

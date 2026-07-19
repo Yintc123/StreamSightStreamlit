@@ -11,8 +11,8 @@ from lib import state
 from lib.auth import require_auth
 from lib.data_source import get_data_source
 from lib.errors import render_error
-from lib.import_utils import parse_csv_bytes, parse_json_bytes
-from lib.models import CATEGORIES, DEFAULT_SORT, RecordNotFound, ValidationError, can_edit, can_write
+from lib.import_utils import parse_csv_bytes, parse_json_bytes, summarize_import
+from lib.models import CATEGORIES, DEFAULT_SORT, RecordNotFound, can_edit, can_write
 from lib.ui import empty_state, pagination_controls
 
 require_auth()
@@ -29,6 +29,12 @@ def _edit_dialog(record_id: int) -> None:
         record = ds.get_record(record_id)
     except RecordNotFound:
         st.warning("資料不存在或已被移除")
+        if st.button("關閉", key="dm_edit_close"):
+            st.session_state.pop("dm_edit_id", None)
+            st.rerun()
+        return
+    except Exception as exc:
+        render_error(exc)
         if st.button("關閉", key="dm_edit_close"):
             st.session_state.pop("dm_edit_id", None)
             st.rerun()
@@ -54,8 +60,8 @@ def _edit_dialog(record_id: int) -> None:
             st.session_state.pop("dm_edit_id", None)
             st.toast("已更新")
             st.rerun()
-        except ValidationError as e:
-            st.error(str(e))
+        except Exception as exc:
+            render_error(exc)   # ValidationError / ApiError 等一律依 error-handling §3 呈現
 
 
 @st.dialog("確認刪除")
@@ -68,14 +74,23 @@ def _delete_dialog(record_id: int) -> None:
             st.session_state.pop("dm_delete_id", None)
             st.rerun()
         return
+    except Exception as exc:
+        render_error(exc)
+        if st.button("關閉", key="dm_delete_close"):
+            st.session_state.pop("dm_delete_id", None)
+            st.rerun()
+        return
 
     st.write(f"確定刪除「**{record.title}**」？此操作無法復原。")
     col_confirm, col_cancel = st.columns(2)
     if col_confirm.button("確認刪除", type="primary", use_container_width=True):
-        ds.delete_record(record_id, actor)
-        st.session_state.pop("dm_delete_id", None)
-        st.toast("已刪除")
-        st.rerun()
+        try:
+            ds.delete_record(record_id, actor)
+            st.session_state.pop("dm_delete_id", None)
+            st.toast("已刪除")
+            st.rerun()
+        except Exception as exc:
+            render_error(exc)   # 失敗保留 dialog，可重試或取消
     if col_cancel.button("取消", use_container_width=True):
         st.session_state.pop("dm_delete_id", None)
         st.rerun()
@@ -203,12 +218,29 @@ with create_tab:
                 )
                 st.toast("已新增")
                 st.rerun()
-            except ValidationError as e:
-                st.error(str(e))
+            except Exception as exc:
+                render_error(exc)   # ValidationError / ApiError 等一律依 error-handling §3 呈現
 
 with import_tab:
     st.markdown("支援 **CSV**（含表頭）或 **JSON**（物件陣列），單檔最多 1000 列。")
     st.markdown("必填欄位：`title`、`value`、`category`（需為感測器/系統/應用/網路之一）；選填：`note`。")
+
+    # flash：上一輪匯入結果（成功 rerun 刷新列表後，訊息仍要顯示）
+    if "dm_import_result" in st.session_state:
+        _level, _msg, _detail = summarize_import(st.session_state.pop("dm_import_result"))
+        {"success": st.success, "warning": st.warning}[_level](_msg)
+        if _detail:
+            st.caption(_detail)
+
+    # trigger：確認匯入按下後由此執行（同 dm_edit_id 的 session trigger pattern，
+    # 讓 AppTest 可直接注入 dm_import_rows 驅動此路徑）
+    if "dm_import_rows" in st.session_state:
+        _rows = st.session_state.pop("dm_import_rows")
+        try:
+            st.session_state["dm_import_result"] = ds.bulk_create(_rows, actor)
+            st.rerun()   # 刷新列表；結果訊息由上方 flash 區塊顯示
+        except Exception as exc:
+            render_error(exc)   # st.error（附 request_id），保留頁框可重試
 
     uploaded = st.file_uploader(
         "選擇檔案",
@@ -237,16 +269,5 @@ with import_tab:
                     st.caption(f"（僅顯示前 10 列）")
 
                 if st.button("確認匯入", type="primary", key="dm_import_confirm", disabled=not writable):
-                    result = ds.bulk_create(rows, actor)
-                    if result.errors:
-                        st.warning(
-                            f"匯入完成：成功 **{result.created}** 筆，"
-                            f"錯誤 **{len(result.errors)}** 筆（錯誤列未建立）。"
-                        )
-                        st.caption(
-                            f"錯誤列：{', '.join(str(e.row_index + 1) for e in result.errors[:5])}"
-                            + ("…" if len(result.errors) > 5 else "")
-                        )
-                    else:
-                        st.success(f"匯入完成：成功 **{result.created}** 筆。")
+                    st.session_state["dm_import_rows"] = rows
                     st.rerun()

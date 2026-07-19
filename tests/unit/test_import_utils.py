@@ -115,3 +115,42 @@ class TestParseJsonBytes:
         assert rows == []
         assert err is not None
         assert "1000" in err
+
+
+class TestSummarizeImport:
+    """summarize_import：ImportResult → (level, message, detail) 顯示三元組。"""
+
+    def test_all_success(self):
+        from lib.import_utils import summarize_import
+        from lib.models import ImportResult
+
+        level, message, detail = summarize_import(ImportResult(created=3, errors=[]))
+        assert level == "success"
+        assert "3" in message
+        assert detail is None
+
+    def test_partial_errors_lists_row_numbers(self):
+        from lib.import_utils import summarize_import
+        from lib.models import ImportResult, RowError
+
+        result = ImportResult(
+            created=1,
+            errors=[RowError(row_index=2, reason="bad"), RowError(row_index=4, reason="bad")],
+        )
+        level, message, detail = summarize_import(result)
+        assert level == "warning"
+        assert "1" in message and "2" in message   # 成功 1 筆、錯誤 2 筆
+        assert detail is not None
+        assert "3" in detail and "5" in detail     # row_index+1（1-based 列號）
+
+    def test_more_than_five_errors_truncated_with_ellipsis(self):
+        from lib.import_utils import summarize_import
+        from lib.models import ImportResult, RowError
+
+        result = ImportResult(
+            created=0,
+            errors=[RowError(row_index=i, reason="bad") for i in range(6)],
+        )
+        _, _, detail = summarize_import(result)
+        assert detail.endswith("…")
+        assert "6" not in detail.replace("錯誤", "")  # 只列前 5 列（列號 1–5）

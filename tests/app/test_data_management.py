@@ -299,3 +299,164 @@ def test_dev_switcher_switches_user_and_updates_button_state():
     viewer_disabled = [b.disabled for b in at.button if b.label == "編輯"]
     assert viewer_disabled            # 仍有列出資料
     assert all(viewer_disabled)       # viewer:全部不可編輯（唯讀）
+
+
+# ── 匯入執行：session trigger（dm_import_rows）+ flash（dm_import_result） ────
+# AppTest 不支援 file_uploader，改以 trigger key 直接驅動匯入執行路徑。
+
+class _StubDS:
+    """可注入行為的假 DataSource（僅實作本組測試用到的方法）。"""
+
+    def __init__(self, bulk_result=None, bulk_exc=None):
+        self._bulk_result = bulk_result
+        self._bulk_exc = bulk_exc
+
+    def list_records(self, **kw):
+        from lib.models import Page
+        return Page(items=[], total=0, page=1, size=20)
+
+    def bulk_create(self, rows, actor):
+        if self._bulk_exc is not None:
+            raise self._bulk_exc
+        return self._bulk_result
+
+
+def _open_dm_with_ds(monkeypatch, ds, actor=None) -> AppTest:
+    from lib import data_source as _ds_mod
+
+    monkeypatch.setattr(_ds_mod, "get_data_source", lambda: ds)
+    at = AppTest.from_file(APP_PATH)
+    at.session_state["actor"] = actor or Actor("alice", "admin", grade=AdminRole.EDITOR)
+    at.run()
+    at.switch_page("pages/data_management.py")
+    at.run()
+    return at
+
+
+def test_import_bulk_create_api_error_shows_error_not_crash(monkeypatch):
+    """bulk_create 拋 ApiError → render_error（st.error）呈現，不 crash、不 rerun。"""
+    ds = _StubDS(bulk_exc=ApiError("連線逾時", status=None, request_id="imp-1"))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    at.session_state["dm_import_rows"] = [{"title": "X", "value": 1, "category": "感測器"}]
+    at.run()
+    assert not at.exception
+    assert at.error
+
+
+def test_import_success_message_survives_rerun(monkeypatch):
+    """匯入成功 → rerun 刷新列表後，成功訊息仍顯示（flash pattern，不被 rerun 沖掉）。"""
+    from lib.models import ImportResult
+
+    ds = _StubDS(bulk_result=ImportResult(created=3, errors=[]))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    at.session_state["dm_import_rows"] = [{"title": "X", "value": 1, "category": "感測器"}]
+    at.run()
+    assert not at.exception
+    assert any("3" in s.value for s in at.success)
+
+
+def test_import_partial_errors_show_warning_with_row_numbers(monkeypatch):
+    """部分錯誤 → warning + 錯誤列號（1-based）標示，訊息同樣不被 rerun 沖掉。"""
+    from lib.models import ImportResult, RowError
+
+    ds = _StubDS(bulk_result=ImportResult(
+        created=1, errors=[RowError(row_index=2, reason="bad")],
+    ))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    at.session_state["dm_import_rows"] = [{"title": "X", "value": 1, "category": "感測器"}]
+    at.run()
+    assert not at.exception
+    assert any("1" in w.value for w in at.warning)
+    captions = [c.value for c in at.caption]
+    assert any("3" in c for c in captions)   # row_index=2 → 列號 3
+
+
+# ── 寫入路徑錯誤處理：所有 ds.* 失敗一律 render_error，不 crash ────────────
+
+def _seed_record():
+    from datetime import datetime, timezone
+
+    from lib.models import Record
+    _now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    return Record(id=1, title="種子", value=1.0, category="感測器",
+                  created_by="alice", created_at=_now, updated_at=_now)
+
+
+class _WriteFailDS(_StubDS):
+    """寫入操作可注入例外的假 DataSource。"""
+
+    def __init__(self, get_exc=None, create_exc=None, update_exc=None, delete_exc=None):
+        super().__init__()
+        self._excs = {"get": get_exc, "create": create_exc,
+                      "update": update_exc, "delete": delete_exc}
+
+    def list_records(self, **kw):
+        from lib.models import Page
+        return Page(items=[_seed_record()], total=1, page=1, size=20)
+
+    def _maybe_raise(self, op):
+        if self._excs[op] is not None:
+            raise self._excs[op]
+
+    def get_record(self, rid):
+        self._maybe_raise("get")
+        return _seed_record()
+
+    def create_record(self, data, actor):
+        self._maybe_raise("create")
+        return _seed_record()
+
+    def update_record(self, rid, data, actor):
+        self._maybe_raise("update")
+        return _seed_record()
+
+    def delete_record(self, rid, actor):
+        self._maybe_raise("delete")
+
+
+def test_create_api_error_shows_error_not_crash(monkeypatch):
+    """create_record 拋 ApiError → render_error（st.error），不 crash。"""
+    ds = _WriteFailDS(create_exc=ApiError("連線逾時", status=None, request_id="c-1"))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    title_input = next(t for t in at.text_input if t.label == "標題")
+    title_input.set_value("X")
+    next(b for b in at.button if b.label == "送出").click()
+    at.run()
+    assert not at.exception
+    assert at.error
+
+
+def test_update_api_error_shows_error_not_crash(monkeypatch):
+    """update_record 拋 ApiError → dialog 內 render_error，不 crash。"""
+    ds = _WriteFailDS(update_exc=ApiError("連線逾時", status=None, request_id="u-1"))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    at.session_state["dm_edit_id"] = 1
+    at.run()
+    at.session_state["dm_edit_id"] = 1   # re-arm（AppTest 無 fragment rerun）
+    next(b for b in at.button if b.label == "更新").click()
+    at.run()
+    assert not at.exception
+    assert at.error
+
+
+def test_delete_api_error_shows_error_not_crash(monkeypatch):
+    """delete_record 拋 ApiError → dialog 內 render_error，不 crash。"""
+    ds = _WriteFailDS(delete_exc=ApiError("連線逾時", status=None, request_id="d-1"))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    at.session_state["dm_delete_id"] = 1
+    at.run()
+    at.session_state["dm_delete_id"] = 1   # re-arm
+    next(b for b in at.button if b.label == "確認刪除").click()
+    at.run()
+    assert not at.exception
+    assert at.error
+
+
+def test_dialog_get_record_api_error_shows_error_not_crash(monkeypatch):
+    """dialog 載入 get_record 拋 ApiError → render_error + 可關閉，不 crash。"""
+    ds = _WriteFailDS(get_exc=ApiError("連線逾時", status=None, request_id="g-1"))
+    at = _open_dm_with_ds(monkeypatch, ds)
+    at.session_state["dm_edit_id"] = 1
+    at.run()
+    assert not at.exception
+    assert at.error
