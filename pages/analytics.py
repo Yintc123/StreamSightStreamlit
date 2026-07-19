@@ -7,6 +7,7 @@
 import pandas as pd
 import streamlit as st
 
+from lib.auth import require_auth
 from lib.analytics import (
     agg_by_category,
     agg_stats,
@@ -20,6 +21,8 @@ from lib.data_source import get_data_source
 from lib.errors import render_error
 from lib.models import CATEGORIES
 from lib.ui import Metric, empty_state, filter_bar, metric_cards
+
+require_auth()
 
 st.title("資料分析")
 

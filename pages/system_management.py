@@ -4,6 +4,7 @@
 """
 import streamlit as st
 
+from lib.auth import require_auth
 from lib.system_management import (
     color_log_level,
     format_db_size,
@@ -12,7 +13,9 @@ from lib.system_management import (
 )
 from lib.ui import Metric, empty_state, filter_bar, metric_cards, pagination_controls
 
-# ── 頁面主體 ─────────────────────────────────────────────────────
+require_auth()
+
+# ── 頁面主体 ─────────────────────────────────────────────────────
 st.title("系統管理")
 
 logs_tab, db_tab = st.tabs(["日誌", "DB 狀態"])

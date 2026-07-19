@@ -8,11 +8,14 @@ import pandas as pd
 import streamlit as st
 
 from lib import state
+from lib.auth import require_auth
 from lib.data_source import get_data_source
 from lib.errors import render_error
 from lib.import_utils import parse_csv_bytes, parse_json_bytes
 from lib.models import CATEGORIES, DEFAULT_SORT, RecordNotFound, ValidationError, can_edit, can_write
 from lib.ui import empty_state, pagination_controls
+
+require_auth()
 
 # ── module-level：dialog 函式必須在最頂層定義 ────────────────────
 ds = get_data_source()

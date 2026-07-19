@@ -17,7 +17,7 @@ Streamlit 前端切分為 4 個頁面,以 `st.navigation` + `st.Page` 組成,並
 ## 存取控制（本節為存取軸的單一真相）
 
 - 認證採 **Design B**(見 [ADR 0003](../decisions/0003-auth-via-bff-token-exchange.md)):auth gate 讀共享 cookie → 經主前端 BFF `GET /api/auth/session` 換取身分 / `role` / `grade` 與短命 JWT,存於 `st.session_state`。
-- 未登入時 `app.py` 直接 meta refresh 跳轉 Next.js 登入頁(**不註冊任何業務頁**)。
+- 未登入時 `app.py` 直接 meta refresh 跳轉 Next.js 登入頁(**不註冊任何業務頁**)。此為**正常路徑守衛**；各業務頁面先頭另呼叫 `require_auth()`（`lib/auth.py`）作為**安全兜底層**，防禦 Streamlit MPA script runner 在 `app.py` 之後另行執行頁面時 session 已過期的邊緣情況（詳見 [Auth 模組 §3a](auth.md#3a-require_auth-頁面守衛安全兜底層)）。
 - **本系統為 admin-only**:只有 `role == "admin"` 的身分能進入 StreamSight(由後端 / BFF 於發證時保證),故 `role` 在本前端**實質恆為 `"admin"`**;**真正的存取軸是 `grade`**——`super_admin` / `editor` / `viewer`(對應後端 AdminRole)。
 - **讀取**：資料管理 / 即時監控 / 資料分析三頁對所有 grade 開放；**系統管理頁僅 `grade == "super_admin"` 可見**，`editor` 與 `viewer` 不可見（動態不註冊，比隱藏連結更安全）。
 - **寫入**:一律限 **`grade != "viewer"`**(`super_admin` / `editor` 可寫,`viewer` 唯讀);判斷用純函式 **`can_write(actor)`**(單一真相)。資料管理的 CRUD **共用此條**;`viewer` 一律以按鈕停用呈現,後端再強制驗證(深度防禦)。

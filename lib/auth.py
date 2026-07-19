@@ -51,6 +51,21 @@ def resolve_actor() -> Optional[Actor]:
     return actor
 
 
+def require_auth() -> None:
+    """頁面守衛（安全兜底層）：bff 模式下 actor 未設定則重導登入頁並 stop。"""
+    if get_settings().use_mock:
+        return
+    if state.get_actor() is not None:
+        return
+    _s = get_settings()
+    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    st.markdown(
+        f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+        unsafe_allow_html=True,
+    )
+    st.stop()
+
+
 def map_role(raw) -> str:
     """後端數值 role → 字串;role_admin_value(預設 1)為 admin,其餘 user。"""
     return "admin" if raw == get_settings().role_admin_value else "user"

@@ -222,6 +222,38 @@ def test_do_logout_bff_raises_when_csrf_missing(bff_mode, fake_session, monkeypa
         auth._do_logout_bff()
 
 
+# --- require_auth 頁面守衛 ---
+
+def test_require_auth_bff_with_actor_does_not_redirect(bff_mode, fake_session, monkeypatch):
+    """bff 模式，session 已有 actor → 直接回傳，不呼叫 st.markdown / st.stop。"""
+    from lib.models import Actor
+    fake_session["actor"] = Actor("alice", "admin")
+    redirected = []
+    monkeypatch.setattr(st, "markdown", lambda *a, **k: redirected.append(a))
+    monkeypatch.setattr(st, "stop", lambda: redirected.append("stop"))
+    auth.require_auth()
+    assert redirected == []
+
+
+def test_require_auth_bff_without_actor_redirects_and_stops(bff_mode, fake_session, monkeypatch):
+    """bff 模式，session 無 actor → meta refresh 重導登入頁，並呼叫 st.stop()。"""
+    stopped = []
+    redirected = []
+    monkeypatch.setattr(st, "markdown", lambda html, **k: redirected.append(html))
+    monkeypatch.setattr(st, "stop", lambda: stopped.append(True))
+    auth.require_auth()
+    assert stopped == [True]
+    assert any("refresh" in h for h in redirected)
+
+
+def test_require_auth_mock_always_passes(fake_session, monkeypatch):
+    """mock 模式一律通過（actor 可能不在 session，但 mock 不需要 BFF 驗證）。"""
+    stopped = []
+    monkeypatch.setattr(st, "stop", lambda: stopped.append(True))
+    auth.require_auth()
+    assert stopped == []
+
+
 # --- BFF http.Client 連線池（api-client.md §31） ---
 
 def test_bff_http_client_is_shared_across_calls(bff_mode, fake_session, monkeypatch):

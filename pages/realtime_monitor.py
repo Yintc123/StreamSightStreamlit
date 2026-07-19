@@ -16,6 +16,7 @@ from datetime import datetime
 
 import streamlit as st
 
+from lib.auth import require_auth
 from lib.realtime import (
     DEFAULT_THRESHOLD,
     MAX_POINTS,
@@ -29,6 +30,8 @@ from lib.realtime import (
     trim,
 )
 from lib.ui import empty_state, metric_cards
+
+require_auth()
 
 # ── 靜態版面（fragment 外，頁面進入時執行一次）──────────────────────────────
 st.title("即時監控")

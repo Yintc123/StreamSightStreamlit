@@ -31,6 +31,7 @@ class Actor:
 | 函式 | 簽章 | 模式 | 職責 |
 |---|---|---|---|
 | 身分出口 | `resolve_actor() -> Optional[Actor]` | 全部 | `app.py` 唯一入口;吸收 mock/bff 差異(§3) |
+| 頁面守衛 | `require_auth() -> None` | 全部 | 頁面先頭兜底;bff 模式下 `session_state["actor"]` 未設則 meta refresh 跳轉登入頁並 `st.stop()`(詳見§3a) |
 | role 映射 | `map_role(raw) -> Literal["user","admin"]` | bff | 後端數值 role → 字串(§4) |
 | 取 token | `get_access_token() -> str` | bff | 供 api_client 帶 Bearer;經 [`state.get_token()`](app-skeleton.md#71-libstatepy-helper-契約) 讀 `session_state["access_token"]` |
 | 換 token | `refresh_token() -> str` | bff | 重呼 introspection、經 `state.set_token()` 回寫、回傳新值;失敗拋 `NotAuthenticated` |
@@ -52,6 +53,25 @@ class Actor:
 - **mock**:身分由[開發用切換器](app-skeleton.md#4-身分解析resolve_actor兩模式單一出口)寫入 `session_state["actor"]`;`resolve_actor` 只讀不打任何網路。種子預設 `alice/user`。
 - **bff**:流程與快取細節見 [auth-flow §4.2 / §4.6](auth-flow.md#42-每次-rerun-的身分辨識核心流程);`resolve_actor` 內部呼叫 introspection 並落 `Actor` + `access_token` + `token_expires_at` 到 `session_state`。
 - **關鍵**:`app.py` 只看回傳值,不關心模式(骨架 §4)。
+
+---
+
+## 3a. `require_auth()` 頁面守衛（安全兜底層）
+
+`app.py` 的 auth gate 是**正常路徑**的守衛；`require_auth()` 是各頁面先頭呼叫的**兜底層**，防禦以下罕見但可能發生的情境：
+
+- Streamlit MPA 執行模型中，`st.navigation().run()` 實際上由 script runner 在 `app.py` 執行後另行呼叫 `page.run()`，若頁面拋出 `NotAuthenticated` 異常，Streamlit runtime 會直接顯示錯誤，`app.py` 的 `try/except` 無法捕捉。
+- session 在兩個 rerun 間過期，頁面開始執行時 `actor` 已被清除。
+
+**行為定義**
+
+| 條件 | 行為 |
+|---|---|
+| `use_mock=True`（mock 模式） | 直接回傳，不做任何檢查 |
+| `use_mock=False` 且 `session_state["actor"]` 已設 | 直接回傳，正常執行頁面 |
+| `use_mock=False` 且 `session_state["actor"]` 未設 | `st.markdown(<meta refresh>)` 跳轉 `BFF_BASE_URL + BFF_LOGIN_PATH`，接著 `st.stop()` |
+
+**呼叫位置**：四個業務頁（`data_management.py`、`realtime_monitor.py`、`analytics.py`、`system_management.py`）的**頁面主體最頂端**（import 之後、任何 `st.*` 呼叫之前）。
 
 ---
 
@@ -106,6 +126,11 @@ class Actor:
 1. `resolve_actor()` 無 `session_state["actor"]` → 回 `Actor("alice","admin",grade="super_admin")` 並寫回（mock 種子預設 super_admin，確保初次開啟可看全部頁面）。
 2. `session_state["actor"]` 已設(如切換器選 admin)→ 原樣回傳。
 3. mock 下呼 `get_access_token()` → `RuntimeError`。
+
+### `require_auth()` 守衛（§3a）
+A. mock 模式：呼叫後不觸發 `st.stop()`（一律通過）。
+B. bff 模式 + `session_state["actor"]` 已設：不觸發重導，不呼叫 `st.stop()`。
+C. bff 模式 + `session_state["actor"]` 未設：輸出 `<meta refresh>` 並呼叫 `st.stop()`。
 
 ### bff 分支(接 API 階段)
 4. `map_role(1)→"admin"`、`map_role(0)→"user"`、未知→`"user"`。
