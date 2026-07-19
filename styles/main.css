@@ -386,12 +386,24 @@ html[data-theme="dark"] .ss-topbar {
     border-bottom-color: rgba(230, 237, 246, 0.12);   /* line */
 }
 
+/* brand：text-ink-AAA（對齊 CmsTopBar.tsx <Link className="text-ink-AAA">） */
 html[data-theme="dark"] .ss-topbar .ss-topbar__brand,
 html[data-theme="dark"] .ss-topbar .ss-topbar__brand:hover,
-html[data-theme="dark"] .ss-topbar .ss-topbar__brand:visited,
-html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem,
-html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem:hover {
+html[data-theme="dark"] .ss-topbar .ss-topbar__brand:visited {
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    text-decoration: none;
+}
+
+/* 非 active tab + 登出按鈕：text-ink-AA hover:bg-nav-hover
+ * 對齊 CmsTopBar.tsx systemClass inactive 與 logout button */
+html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+    text-decoration: none;
+}
+
+html[data-theme="dark"] .ss-topbar .ss-topbar__sysitem:hover {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA（hover 文字不變） */
+    background-color: rgba(230, 237, 246, 0.08);      /* nav-hover */
     text-decoration: none;
 }
 
@@ -416,6 +428,19 @@ html[data-theme="dark"] .ss-topbar__theme-btn {
 html[data-theme="dark"] .ss-topbar__theme-btn:hover {
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
     background-color: rgba(230, 237, 246, 0.12);      /* line */
+}
+
+/* 側欄收合後展開按鈕：light 用 #f1f5f9 底，dark 用 surface-card（對齊 CmsSideNav bg） */
+html[data-theme="dark"] [data-testid="stExpandSidebarButton"] {
+    background: #151c2b;                              /* surface-card */
+}
+
+html[data-theme="dark"] [data-testid="stExpandSidebarButton"] button {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] [data-testid="stExpandSidebarButton"] button:hover {
+    background-color: rgba(230, 237, 246, 0.08);      /* nav-hover */
 }
 
 /* ── Sidebar Nav ─────────────────────────────────────────────────────────── */
