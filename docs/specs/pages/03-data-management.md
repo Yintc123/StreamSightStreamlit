@@ -2,6 +2,7 @@
 
 - 頁面編號:3
 - 對應模組:模組 2 資料管理
+- URL 路徑:`/data_management`(`st.Page(..., url_path="data_management", default=True)`;併帶預設落地頁,根路徑 `/` 與未匹配路徑（404）皆 fallback 至此)
 - 存取權限:已登入皆可讀取;**寫入限 `grade > AdminRole.VIEWER`**（>0；super_admin/root/editor 可寫，viewer=0 唯讀）。本系統為 admin-only，存取軸為 grade，見[前端頁面結構 §存取控制](../frontend-pages.md#存取控制本節為存取軸的單一真相)。
 - 導覽:所有登入者可見
 - 相關:[前端頁面結構](../frontend-pages.md)、[設計系統](../design-system.md)、[功能能力對照](../feature-capability.md)、[資料來源抽象層(Mock 先行)](../data-source.md)、[ADR 0002](../decisions/0002-streamlit-as-api-client.md)

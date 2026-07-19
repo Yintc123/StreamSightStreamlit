@@ -10,7 +10,11 @@
   - 4401 / 4409：停止重連，last_error 設值
   - 其他（網路 / 4000 / 1012 / 1013）：指數退避（1→2→4→...≤30s）
 
-見規格 docs/specs/pages/04-realtime-ws-client.md。
+生命週期（看門狗 / dead-man's switch）：
+  - live_panel fragment 每秒 touch()；看門狗執行緒發現 >IDLE_STOP_SECONDS 未被 touch
+    （切頁 / 關分頁 / 崩潰使 fragment 停止）→ 設 stop → 主動送 WS close → 執行緒退出。
+
+見規格 docs/specs/pages/04-realtime-ws-client.md 與 04-realtime-ws-lifecycle.md。
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ import asyncio
 import json
 import logging
 import threading
+import time
 from datetime import datetime
 from typing import Callable
 
@@ -30,6 +35,11 @@ from lib.realtime import MAX_POINTS, Reading, trim
 _logger = logging.getLogger(__name__)
 
 _NON_RECONNECTABLE: frozenset[int] = frozenset({4401, 4409})
+
+# 看門狗（dead-man's switch）：fragment 每秒 touch；超過 IDLE_STOP_SECONDS 未被 touch
+# → 判定頁面已離開 / session 已結束 → 主動斷線。見規格 04-realtime-ws-lifecycle.md §1。
+IDLE_STOP_SECONDS = 5.0    # run_every=1.0 下容忍約 4 次漏拍（rerun 抖動 / 整頁 rerun 空窗）
+WATCHDOG_INTERVAL = 1.0    # 看門狗檢查週期
 
 
 class _WsAuthError(Exception):
@@ -116,6 +126,32 @@ def _run_with_reconnect(
         loop.close()
 
 
+def needs_new_client(existing: "RealtimeWsClient | None", use_mock: bool) -> bool:
+    """api 模式下，client 不存在或已停止（看門狗斷線後）→ 需要建立新的。
+
+    頁面守衛用：停留頁面的整頁 rerun → 既有 client is_alive → 重用；
+    斷線後重回頁面 → 舊 client 已死 → 重建（新連線，buffer 從頭累積）。
+    """
+    return (not use_mock) and (existing is None or not existing.is_alive())
+
+
+def _run_watchdog(
+    seconds_since_touch: Callable[[], float],
+    idle_stop: float,
+    interval: float,
+    stop: threading.Event,
+) -> None:
+    """看門狗執行緒：每 interval 秒檢查閒置；超過 idle_stop 未被 touch → 設 stop。
+
+    stop.wait(timeout) 回傳 True（stop 已被設，含外部 stop()）即退出；False（逾時）則續查。
+    設 stop 後：中斷連線執行緒的 backoff 等待、讓接收迴圈 return（送 WS close）、終止重連 while。
+    """
+    while not stop.wait(timeout=interval):
+        if seconds_since_touch() > idle_stop:
+            stop.set()
+            return
+
+
 class RealtimeWsClient:
     """thread-safe WS client；Streamlit fragment 透過 .buffer / .last_error 讀快照。"""
 
@@ -125,20 +161,25 @@ class RealtimeWsClient:
         http_base: str,
         ws_base: str,
         get_token: Callable[[], str],
+        idle_stop_seconds: float = IDLE_STOP_SECONDS,
     ) -> None:
         self._http_base = http_base
         self._ws_base = ws_base
         self._get_token = get_token
+        self._idle_stop = idle_stop_seconds
         self._lock = threading.Lock()
         self._buffer: list[Reading] = []
         self._last_error: str | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._watchdog: threading.Thread | None = None
+        self._last_touch = time.monotonic()   # 心跳時戳；建構即給初值，避免 start 前誤判閒置
 
     def start(self) -> None:
-        """啟動 daemon 執行緒；若執行緒仍活著則 no-op（防重複呼叫）。"""
+        """啟動連線 daemon 執行緒 + 看門狗執行緒；若執行緒仍活著則 no-op（防重複呼叫）。"""
         if self._thread is not None and self._thread.is_alive():
             return
+        self._last_touch = time.monotonic()   # 重置心跳，避免啟動瞬間即被判閒置
         self._thread = threading.Thread(
             target=_run_with_reconnect,
             args=(
@@ -152,10 +193,43 @@ class RealtimeWsClient:
             daemon=True,
         )
         self._thread.start()
+        # 看門狗檢查週期取 min(WATCHDOG_INTERVAL, idle_stop)：確保至少在 idle_stop 窗內檢查一次
+        self._watchdog = threading.Thread(
+            target=_run_watchdog,
+            args=(
+                self._seconds_since_touch,
+                self._idle_stop,
+                min(WATCHDOG_INTERVAL, self._idle_stop),
+                self._stop,
+            ),
+            daemon=True,
+        )
+        self._watchdog.start()
 
     def stop(self) -> None:
         """設定 stop 事件；執行緒於 backoff 等待結束後退出。"""
         self._stop.set()
+
+    def touch(self) -> None:
+        """由 live_panel fragment 每次執行時呼叫；更新心跳時戳（thread-safe）。
+
+        fragment 只在該頁被顯示時每秒執行，故「持續 touch」等價於「本頁仍在顯示」。
+        """
+        with self._lock:
+            self._last_touch = time.monotonic()
+
+    def _seconds_since_touch(self) -> float:
+        """距上次 touch() 的秒數（thread-safe 快照）；看門狗據此判定閒置。"""
+        with self._lock:
+            return time.monotonic() - self._last_touch
+
+    def is_alive(self) -> bool:
+        """連線執行緒仍運行且未被要求停止 → True；供頁面判斷是否需重建 client。"""
+        return (
+            self._thread is not None
+            and self._thread.is_alive()
+            and not self._stop.is_set()
+        )
 
     @property
     def buffer(self) -> list[Reading]:

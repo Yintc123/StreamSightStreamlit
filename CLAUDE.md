@@ -100,9 +100,9 @@ pytest
 ```
 app.py                     # 進入點：認證判斷 + st.navigation
 pages/
-├── data_management.py     # 1. 資料管理
+├── data_management.py     # 1. 資料管理（預設落地頁 default=True；url_path=/data_management，/ 與 404 fallback）
 ├── realtime_monitor.py    # 2. 即時監控（連 FastAPI WebSocket）
-├── analytics.py           # 3. 資料分析（預設落地頁 default=True）
+├── analytics.py           # 3. 資料分析（url_path=/analytics）
 └── system_management.py   # 4. 系統管理（admin-only 系統，皆註冊；寫入限 grade≠viewer）
 lib/
 ├── api_client.py          # FastAPI REST 呼叫封裝（帶 JWT、逾時 / 錯誤處理）

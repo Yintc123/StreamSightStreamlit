@@ -8,14 +8,14 @@ import streamlit as st
 from lib import nav
 from lib.models import Actor, AdminRole
 
-# 以假 Page 捕捉 build_pages 傳入的 (path, title, default),避免 bare 模式下 st.Page 的限制。
-FakePage = namedtuple("FakePage", ["path", "title", "default"])
+# 以假 Page 捕捉 build_pages 傳入的 (path, title, url_path, default),避免 bare 模式下 st.Page 的限制。
+FakePage = namedtuple("FakePage", ["path", "title", "url_path", "default"])
 
 
 @pytest.fixture
 def capture_pages(monkeypatch):
-    def fake_page(path, title=None, default=False):
-        return FakePage(path, title, default)
+    def fake_page(path, title=None, url_path=None, default=False):
+        return FakePage(path, title, url_path, default)
 
     monkeypatch.setattr(st, "Page", fake_page)
 
@@ -67,12 +67,22 @@ def test_dashboard_page_removed(capture_pages):
     assert "儀表板" not in titles
 
 
-def test_default_page_is_analytics(capture_pages):
+def test_default_page_is_data_management(capture_pages):
+    """預設頁為資料管理：Streamlit 以 default=True 頁承接根路徑 / 與 404 fallback。"""
     actor = Actor("viewer", "admin", grade=AdminRole.VIEWER)
     pages = nav.build_pages(actor)
     defaults = [p for p in pages if p.default]
     assert len(defaults) == 1
-    assert defaults[0].title == "資料分析"
+    assert defaults[0].title == "資料管理"
+
+
+def test_data_management_page_has_url_path(capture_pages):
+    """資料管理頁 URL 路徑明確固定為 /data_management（不靠檔名推導），且為預設頁。"""
+    actor = Actor("viewer", "admin", grade=AdminRole.VIEWER)
+    dm = next(p for p in nav.build_pages(actor) if p.title == "資料管理")
+    assert dm.url_path == "data_management"
+    # 同時為預設頁：/ 與 404 亦 fallback 至此
+    assert dm.default is True
 
 
 # --- 頁面順序與路徑（frontend-pages.md 頁面一覽 / 檔案結構） ---
@@ -101,6 +111,15 @@ def test_page_file_paths(capture_pages):
         "pages/analytics.py",
         "pages/system_management.py",
     ]
+
+
+def test_analytics_page_has_url_path(capture_pages):
+    """資料分析頁 URL 路徑固定為 /analytics（frontend-pages.md 頁面一覽）。"""
+    actor = Actor("viewer", "admin", grade=AdminRole.VIEWER)
+    analytics = next(p for p in nav.build_pages(actor) if p.title == "資料分析")
+    assert analytics.url_path == "analytics"
+    # 不再是預設頁：/ 與 404 fallback 改由資料管理承接
+    assert analytics.default is False
 
 
 # --- render_dev_switcher 純邏輯（app-skeleton §3⑤ / CLAUDE.md lib/ 需有 unit test） ---

@@ -4,15 +4,16 @@ Streamlit 前端切分為 4 個頁面,以 `st.navigation` + `st.Page` 組成,並
 
 ## 頁面一覽
 
-| # | 頁面 | 對應模組 | 存取權限 | 頁內分頁(tabs) | 規格 |
-|---|---|---|---|---|---|
-| 1 | 資料管理 | 模組 2 | 已登入；寫入限 `grade > AdminRole.VIEWER`（>0） | 列表 / 新增 / 匯入 | [規格](pages/03-data-management.md) |
-| 2 | 即時監控 | 模組 3 | 已登入 | —（單頁：即時圖表＋告警） | [規格](pages/04-realtime-monitor.md) |
-| 3 | 資料分析 / 首頁 | 模組 4 | 已登入 | 統計 / 趨勢 / 匯出 | [規格](pages/05-analytics.md) |
-| 4 | 系統管理 | 模組 5 | **僅 `grade >= AdminRole.SUPER_ADMIN`（≥100，含 ROOT=999）**（`editor` / `viewer` 不可見） | 日誌 / DB 狀態（管理員管理已移至主前端 CMS） | [規格](pages/06-admin.md) |
+| # | 頁面 | 對應模組 | URL 路徑 | 存取權限 | 頁內分頁(tabs) | 規格 |
+|---|---|---|---|---|---|---|
+| 1 | 資料管理 / 首頁 | 模組 2 | **`/data_management`**（`url_path="data_management"`）＋ `default=True` — 根路徑 `/` 與未匹配路徑（404）皆 fallback 至此 | 已登入；寫入限 `grade > AdminRole.VIEWER`（>0） | 列表 / 新增 / 匯入 | [規格](pages/03-data-management.md) |
+| 2 | 即時監控 | 模組 3 | (由檔名推導) | 已登入 | —（單頁：即時圖表＋告警） | [規格](pages/04-realtime-monitor.md) |
+| 3 | 資料分析 | 模組 4 | **`/analytics`**（`url_path="analytics"`） | 已登入 | 統計 / 趨勢 / 匯出 | [規格](pages/05-analytics.md) |
+| 4 | 系統管理 | 模組 5 | (由檔名推導) | **僅 `grade >= AdminRole.SUPER_ADMIN`（≥100，含 ROOT=999）**（`editor` / `viewer` 不可見） | 日誌 / DB 狀態（管理員管理已移至主前端 CMS） | [規格](pages/06-admin.md) |
 
 > **未登入導向**:由 `app.py` 直接處理(非頁面)。詳見 [Auth Gate 導向規格](pages/01-login.md)。
-> **預設落地頁**:資料分析(`default=True`)。原「儀表板 / 首頁」已移除,登入後首先落在資料分析。
+> **預設落地頁 / 根路徑 / 404 fallback**:資料管理,以 `url_path="data_management"` 固定路徑為 `/data_management`,併帶 `default=True`。Streamlit 以唯一 `default=True` 頁承接根路徑 `/` **與未匹配路徑（404）** 的 fallback,故 `/data_management` 直接命中該頁,而 `/`、不存在路徑亦回落至此(登入後首先落在資料管理)。註:對預設頁而言 `/` 為其正規首頁,經根路徑進站時網址列多顯示 `/`,但 `/data_management` 一樣服務同頁。原「儀表板 / 首頁」已移除。
+> **資料分析 URL 路徑**:以 `st.Page(..., url_path="analytics")` 固定為 `/analytics`,供直接深連結;其餘頁面未指定 `url_path`,由檔名推導。
 
 ## 存取控制（本節為存取軸的單一真相）
 
@@ -29,9 +30,9 @@ Streamlit 前端切分為 4 個頁面,以 `st.navigation` + `st.Page` 組成,並
 ```
 app.py                        # 進入點:認證判斷 + meta refresh(未登入)+ st.navigation
 pages/
-├── data_management.py        # 1. 資料管理
+├── data_management.py        # 1. 資料管理(url_path="data_management" → /data_management;預設頁 default=True,/ 與 404 fallback)
 ├── realtime_monitor.py       # 2. 即時監控(連 FastAPI WebSocket)
-├── analytics.py              # 3. 資料分析(預設落地頁 default=True)
+├── analytics.py              # 3. 資料分析(url_path="analytics" → /analytics)
 └── system_management.py      # 4. 系統管理(admin-only 系統,grade≥100 才註冊;寫入限 grade>0)
 lib/                          # 本清單僅摘要;完整權威地圖見 app-skeleton §6
 ├── api_client.py             # FastAPI REST 呼叫封裝(帶 JWT、逾時 / 錯誤處理)

@@ -55,9 +55,9 @@ uv run streamlit run app.py
 
 | 頁面 | 檔案 | 說明 |
 |---|---|---|
-| 資料管理 | `pages/data_management.py` | Record CRUD 與 CSV / JSON 匯入 |
+| 資料管理 | `pages/data_management.py` | Record CRUD 與 CSV / JSON 匯入（預設落地頁；`/data_management`，`/` 與 404 fallback） |
 | 即時監控 | `pages/realtime_monitor.py` | 接 FastAPI WebSocket 即時讀值與圖表 |
-| 資料分析 | `pages/analytics.py` | 統計分析（預設落地頁） |
+| 資料分析 | `pages/analytics.py` | 統計分析（`/analytics`） |
 | 系統管理 | `pages/system_management.py` | Admin-only，非 Admin **動態不註冊**此頁 |
 
 登入委派 Next.js 主前端：未登入時 `app.py` 直接跳轉登入頁，Streamlit 本身沒有登入頁。

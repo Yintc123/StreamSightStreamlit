@@ -11,13 +11,13 @@ from lib.models import Actor, AdminRole
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
 
 
-def test_app_runs_and_defaults_to_analytics():
-    """全 mock 下進站:app 無例外,預設落在資料分析(儀表板已移除;app-skeleton §9、§10 步驟 5)。"""
+def test_app_runs_and_defaults_to_data_management():
+    """全 mock 下進站:app 無例外,預設落在資料管理(/ 與 404 fallback 頁;儀表板已移除;app-skeleton §9、§10 步驟 5)。"""
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not at.exception
     titles = [t.value for t in at.title]
-    assert "資料分析" in titles
+    assert "資料管理" in titles
     assert "儀表板" not in titles
 
 
@@ -39,7 +39,7 @@ def test_bff_no_actor_redirects_to_login(monkeypatch):
     at.run()
     assert not at.exception
     titles = [t.value for t in at.title]
-    assert "資料分析" not in titles
+    assert "資料管理" not in titles  # 重導時不渲染任何業務頁（含新預設頁資料管理）
     # meta refresh 含 /login 路徑
     markdowns = [m.value for m in at.markdown]
     assert any("/login" in m for m in markdowns)
@@ -164,7 +164,7 @@ def test_logout_param_calls_logout_in_mock(monkeypatch):
     at.run()
     assert not at.exception
     assert "actor" in at.session_state               # 預設 mock actor 重建
-    assert "資料分析" in [t.value for t in at.title]  # 正常進站（預設落地頁）
+    assert "資料管理" in [t.value for t in at.title]  # 正常進站（預設落地頁）
 
 
 def test_logout_param_redirects_to_login_in_bff(monkeypatch):

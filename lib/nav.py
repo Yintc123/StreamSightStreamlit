@@ -25,9 +25,11 @@ _DEV_ACTORS = [
 def build_pages(actor: Actor) -> List:
     """依 actor.grade 回傳 st.Page 清單；grade >= SUPER_ADMIN（≥100）才追加系統管理頁。"""
     pages = [
-        st.Page("pages/data_management.py", title="資料管理"),
+        # 資料管理：url_path 明確固定為 /data_management（不靠檔名推導）；
+        # 併帶 default=True → Streamlit 以預設頁承接根路徑 / 與未匹配路徑（404）fallback。
+        st.Page("pages/data_management.py", title="資料管理", url_path="data_management", default=True),
         st.Page("pages/realtime_monitor.py", title="即時監控"),
-        st.Page("pages/analytics.py", title="資料分析", default=True),
+        st.Page("pages/analytics.py", title="資料分析", url_path="analytics"),
     ]
     if actor.role == "admin" and (actor.grade or 0) >= AdminRole.SUPER_ADMIN:
         pages.append(st.Page("pages/system_management.py", title="系統管理"))

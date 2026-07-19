@@ -196,9 +196,9 @@ from lib.models import AdminRole
 
 def build_pages(actor: Actor) -> list:
     pages = [
-        st.Page("pages/data_management.py",  title="資料管理"),
+        st.Page("pages/data_management.py",  title="資料管理", url_path="data_management", default=True),  # /data_management；/ 與 404 fallback
         st.Page("pages/realtime_monitor.py", title="即時監控"),
-        st.Page("pages/analytics.py",        title="資料分析", default=True),
+        st.Page("pages/analytics.py",        title="資料分析", url_path="analytics"),
     ]
     if actor.role == "admin" and actor.grade >= AdminRole.SUPER_ADMIN:
         pages.append(st.Page("pages/system_management.py", title="系統管理"))
@@ -206,7 +206,8 @@ def build_pages(actor: Actor) -> list:
 ```
 
 - **存取控制**(權威定義見[前端頁面結構 §存取控制](frontend-pages.md#存取控制本節為存取軸的單一真相)):系統管理頁**僅 `grade >= AdminRole.SUPER_ADMIN`（≥100，含 ROOT=999）才註冊**；`editor`（50）/ `viewer`（0）不可見（動態不註冊，比隱藏連結更安全）。`actor.role == "admin"` 的前置條件保留作為 latent 防線（本部署 role 恆 admin，但明確條件讓意圖清晰）。
-- **預設落地頁**:儀表板已移除,改由**資料分析**帶 `default=True`,登入後首先落在資料分析。
+- **預設落地頁 / 根路徑 / 404 fallback**:儀表板已移除,改由**資料管理**以 `url_path="data_management"` 固定路徑 `/data_management`,併帶 `default=True`。Streamlit 以唯一 `default=True` 頁承接根路徑 `/` **與未匹配路徑(404)** 的 fallback(見 `st.navigation`:`get_page_script` 找不到頁時回落至 `default_page`),故 `/data_management` 直接命中,`/` 與不存在路徑亦回落至此(登入後首先落在資料管理)。
+- **資料分析 URL 路徑**:資料分析頁以 `url_path="analytics"` 固定 URL 路徑為 `/analytics`(可直接以該路徑深連結),不再是預設頁。
 - 骨架階段允許其他業務頁為 placeholder(`st.info("建置中")`),先讓導覽與 gate 成立。
 
 ---
@@ -275,9 +276,9 @@ def build_pages(actor: Actor) -> list:
 ```
 app.py                      # 進入點(§3);未登入 meta refresh → Next.js 登入頁
 pages/                      # 檔名對齊 CLAUDE.md(無編號);順序由 build_pages 顯式決定
-├── data_management.py      # 資料管理
+├── data_management.py      # 資料管理(url_path="data_management" → /data_management;預設頁,/ 與 404 fallback)
 ├── realtime_monitor.py     # 即時監控
-├── analytics.py            # 資料分析(預設落地頁 default=True)
+├── analytics.py            # 資料分析(url_path="analytics" → /analytics)
 └── system_management.py    # 系統管理(admin-only 系統,皆註冊;寫入限 grade≠viewer)
 lib/                        # 見 §6
 styles/main.css             # 共用 CSS
@@ -327,7 +328,7 @@ uv run streamlit run app.py # 全 mock 下即可跑
 2. `lib/models.py`:`Actor`(含 `grade: int`)+ `AdminRole` 常數 + `can_edit(record, actor)` + `can_write(actor)`(`actor.grade > AdminRole.VIEWER`)。(unit)
 3. `lib/auth.py`:`resolve_actor()` mock 分支(預設 admin 身分如 `alice/admin/grade=100`、grade 可被 session 覆寫)。(unit)
 4. `lib/nav.py`:`build_pages(actor)`——`grade >= AdminRole.SUPER_ADMIN`（≥100）才註冊系統管理頁；`editor`（50）/`viewer`（0）不可見。(unit)
-5. `app.py` + `AppTest`:全 mock 下進站顯示導覽、預設落在資料分析(儀表板已移除)。(app)
+5. `app.py` + `AppTest`:全 mock 下進站顯示導覽、預設落在資料管理(/ 與 404 fallback;儀表板已移除)。(app)
 6. `MockDataSource.list_records` + `pages/data_management.py`:資料管理頁能列出種子資料。(unit + app)
 7. 之後接續資料管理其餘 CRUD(見 [data-source §落地順序](data-source.md#對齊-tdd-的落地順序))。
 

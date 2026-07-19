@@ -87,13 +87,18 @@ def test_empty_buffer_shows_empty_state_and_no_metrics():
 class _MockWsClient:
     """注入用的假 WsClient；不啟動執行緒，不連真實後端。"""
 
-    def __init__(self, buffer=None, last_error=None):
+    def __init__(self, buffer=None, last_error=None, alive=True):
         self._buf = buffer or []
         self._last_error = last_error
         self.started = False
+        self.stopped = False
+        self.touch_count = 0
+        self._alive = alive
 
     def start(self): self.started = True
-    def stop(self): pass
+    def stop(self): self.stopped = True
+    def touch(self): self.touch_count += 1
+    def is_alive(self): return self._alive
 
     @property
     def buffer(self): return list(self._buf)
@@ -151,3 +156,43 @@ def test_ws_empty_buffer_shows_empty_state(monkeypatch):
     assert not at.exception
     assert any("串流啟動中" in i.value for i in at.info)
     assert len(at.metric) == 0
+
+
+# ── 測試 32–33：連線生命週期（心跳 / 死連線重建）─────────────────────────────
+# 見 docs/specs/pages/04-realtime-ws-lifecycle.md §7.2。
+
+
+# 測試 32：live_panel 每次 render 呼叫 touch()（心跳存在 → 看門狗不誤斷）
+def test_live_panel_touches_client(monkeypatch):
+    mock = _MockWsClient(buffer=[Reading(ts=_NOW, value=42.0)], alive=True)
+    at = _open_monitor_api(
+        Actor("alice", "admin", grade=AdminRole.VIEWER),
+        monkeypatch,
+        rt_ws_client=mock,
+    )
+    assert not at.exception
+    assert mock.touch_count >= 1
+
+
+# 測試 33：注入「已死」client → 頁面重建新 client（不重用舊的）
+def test_dead_client_is_replaced(monkeypatch):
+    created = {}
+
+    class _Spy(_MockWsClient):
+        def __init__(self, **_kwargs):        # 吞掉 http_base/ws_base/get_token
+            super().__init__(alive=True)
+            created["new"] = self
+
+    # 頁面 `from lib.realtime_ws import RealtimeWsClient` 於 at.run() re-exec 時取到 spy
+    monkeypatch.setattr("lib.realtime_ws.RealtimeWsClient", _Spy)
+
+    dead = _MockWsClient(alive=False)
+    at = _open_monitor_api(
+        Actor("alice", "admin", grade=AdminRole.VIEWER),
+        monkeypatch,
+        rt_ws_client=dead,
+    )
+    assert not at.exception
+    assert "new" in created                   # 已死 → 重建
+    assert created["new"].started is True      # 新 client 有 start()
+    assert dead.touch_count == 0               # 舊的未被使用
