@@ -294,3 +294,21 @@ def test_fastapi_ws_url_no_double_replace(monkeypatch):
     assert result.startswith("wss://")
     assert "wsss" not in result
 
+
+
+# --- 閒置逾時設定（idle-timeout §7、config §3.8） ---
+
+def test_idle_timeout_defaults():
+    """IDLE_TIMEOUT_SECONDS 預設 900（15 分）、IDLE_ACTIVITY_THROTTLE_SECONDS 預設 30。"""
+    s = get_settings()
+    assert s.idle_timeout_seconds == 900
+    assert s.idle_activity_throttle_seconds == 30
+
+
+def test_idle_timeout_env_override(monkeypatch):
+    """可由 env 覆寫（本機驗證常把門檻調小）。"""
+    monkeypatch.setenv("IDLE_TIMEOUT_SECONDS", "10")
+    monkeypatch.setenv("IDLE_ACTIVITY_THROTTLE_SECONDS", "5")
+    s = get_settings()
+    assert s.idle_timeout_seconds == 10
+    assert s.idle_activity_throttle_seconds == 5

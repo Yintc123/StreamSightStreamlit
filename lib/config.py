@@ -71,6 +71,10 @@ class BaseAppSettings(BaseSettings):
     token_refresh_threshold_seconds: int = 60
     introspection_cache_ttl_seconds: int = 30
 
+    # 閒置逾時(§3.8;idle-timeout §7、§8;純前端 JS 偵測滑鼠/鍵盤)
+    idle_timeout_seconds: int = 900  # 連續無活動達此秒數 → 自動登出(15 分)
+    idle_activity_throttle_seconds: int = 30  # 活動事件節流,避免 mousemove 高頻洗版
+
     @property
     def bff_login_url(self) -> str:
         """瀏覽器要跳轉的登入頁完整 URL(public base + login path)。"""

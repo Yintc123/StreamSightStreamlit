@@ -198,3 +198,100 @@ def test_logout_param_redirects_to_login_in_bff(monkeypatch):
     assert called["logout_bff"] == 1
     markdowns = [m.value for m in at.markdown]
     assert any("refresh" in m and "login" in m for m in markdowns)
+
+
+# ── 閒置逾時（idle-timeout §8.2）──────────────────────────────────────────────
+
+def test_idle_js_injected_into_app(monkeypatch):
+    """app 每次 rerun 以 components.html 注入閒置計時器 JS（含冪等清理鉤子）。"""
+    import streamlit.components.v1 as components
+
+    htmls = []
+    monkeypatch.setattr(components, "html", lambda html, **kw: htmls.append(html))
+
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not at.exception
+    assert any("__ssIdleCleanup" in h for h in htmls)   # 閒置 JS 已注入
+    assert any("?logout=1&reason=idle" in h for h in htmls)
+
+
+def test_idle_logout_reason_toast_shown_once():
+    """閒置登出後，下一輪 rerun 顯示「因閒置」toast，且只顯示一次（讀後即 pop）。"""
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+
+    at.session_state["_logout_reason"] = "idle"
+    at.run()
+    assert not at.exception
+    assert any("閒置" in t.value for t in at.toast)      # 顯示一次
+
+    at.run()
+    assert not any("閒置" in t.value for t in at.toast)   # 已 pop，不再出現
+
+
+def test_manual_logout_stays_instant_in_bff(monkeypatch):
+    """手動登出（?logout=1 無 reason）維持即時跳轉 content=0，不受閒置規格拖慢。"""
+    monkeypatch.setenv("USE_MOCK", "0")
+    monkeypatch.setenv("BFF_BASE_URL", "http://localhost:3000")
+    mock_data = {
+        "user": {"id": "u_1", "name": "alice"}, "role": 1, "adminRole": "super_admin",
+        "accessToken": "tok", "expiresAt": 9999999999000, "csrfToken": "csrf-abc",
+    }
+    monkeypatch.setattr("lib.auth.raw_cookie", lambda: "cookie-val")
+    monkeypatch.setattr("lib.auth._introspect", lambda: mock_data)
+    monkeypatch.setattr("lib.auth._do_logout_bff", lambda: None)
+
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    at.query_params["logout"] = "1"
+    at.run()
+    assert not at.exception
+    markdowns = [m.value for m in at.markdown]
+    assert any('content="0;' in m and "login" in m for m in markdowns)   # 即時
+    assert not any('content="3;' in m for m in markdowns)
+
+
+def test_idle_logout_uses_interstitial_in_bff(monkeypatch):
+    """閒置登出（?logout=1&reason=idle）走過場頁：顯示原因 + 延時 content=3 跳轉。"""
+    monkeypatch.setenv("USE_MOCK", "0")
+    monkeypatch.setenv("BFF_BASE_URL", "http://localhost:3000")
+    mock_data = {
+        "user": {"id": "u_1", "name": "alice"}, "role": 1, "adminRole": "super_admin",
+        "accessToken": "tok", "expiresAt": 9999999999000, "csrfToken": "csrf-abc",
+    }
+    monkeypatch.setattr("lib.auth.raw_cookie", lambda: "cookie-val")
+    monkeypatch.setattr("lib.auth._introspect", lambda: mock_data)
+    monkeypatch.setattr("lib.auth._do_logout_bff", lambda: None)
+
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    at.query_params["logout"] = "1"
+    at.query_params["reason"] = "idle"
+    at.run()
+    assert not at.exception
+    markdowns = [m.value for m in at.markdown]
+    assert any('content="3;' in m and "login" in m for m in markdowns)   # 延時過場
+    assert any("閒置" in i.value for i in at.info)                        # 原因提示
+
+
+def test_idle_logout_reason_whitelist_rejects_injection(monkeypatch):
+    """?logout=1&reason=<script>：非白名單 → 走一般登出、不顯示閒置提示、不反射字串。"""
+    called = {"n": 0}
+
+    def _spy_logout():
+        from lib import state
+        called["n"] += 1
+        state.clear_auth()
+
+    monkeypatch.setattr("lib.auth.logout", _spy_logout)
+
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    at.query_params["logout"] = "1"
+    at.query_params["reason"] = "<script>alert(1)</script>"
+    at.run()
+    assert not at.exception
+    assert called["n"] >= 1                                    # 仍登出
+    assert not any("閒置" in t.value for t in at.toast)         # 無閒置提示
+    assert not any("<script>" in m.value for m in at.markdown)  # 未反射注入字串

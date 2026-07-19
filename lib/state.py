@@ -16,6 +16,7 @@ _ACCESS_TOKEN = "access_token"
 _TOKEN_EXPIRES_AT = "token_expires_at"
 _CSRF_TOKEN = "csrf_token"
 _LAST_REQUEST_ID = "last_request_id"
+_LOGOUT_REASON = "_logout_reason"
 
 
 def get_actor() -> Optional[Actor]:
@@ -47,7 +48,17 @@ def set_last_request_id(rid: Optional[str]) -> None:
     st.session_state[_LAST_REQUEST_ID] = rid
 
 
+def set_logout_reason(reason: str) -> None:
+    """存登出原因(如 'idle'),供下一輪 rerun 顯示提示;跨 clear_auth 存活。"""
+    st.session_state[_LOGOUT_REASON] = reason
+
+
+def pop_logout_reason() -> Optional[str]:
+    """讀出並清除登出原因(只顯示一次)。"""
+    return st.session_state.pop(_LOGOUT_REASON, None)
+
+
 def clear_auth() -> None:
-    """登出 / 401:清 actor / token / csrf_token。"""
+    """登出 / 401:清 actor / token / csrf_token(不含 _logout_reason,需跨 rerun 存活)。"""
     for key in (_ACTOR, _ACCESS_TOKEN, _TOKEN_EXPIRES_AT, _CSRF_TOKEN):
         st.session_state.pop(key, None)

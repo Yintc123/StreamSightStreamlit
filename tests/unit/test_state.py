@@ -75,3 +75,22 @@ def test_clear_auth_removes_csrf_token(fake_session):
     state.clear_auth()
     assert state.get_csrf() is None
     assert "csrf_token" not in fake_session
+
+# --- logout_reason（idle-timeout §6.2、§7.1；不列入 clear_auth） ---
+
+def test_logout_reason_none_when_unset(fake_session):
+    assert state.pop_logout_reason() is None
+
+
+def test_set_then_pop_logout_reason(fake_session):
+    state.set_logout_reason("idle")
+    assert state.pop_logout_reason() == "idle"
+    # pop 後即清，只顯示一次
+    assert state.pop_logout_reason() is None
+
+
+def test_clear_auth_does_not_clear_logout_reason(fake_session):
+    """登出原因需跨 clear_auth/rerun 存活，供下一輪顯示提示。"""
+    state.set_logout_reason("idle")
+    state.clear_auth()
+    assert state.pop_logout_reason() == "idle"

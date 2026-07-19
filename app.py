@@ -5,12 +5,13 @@
 """
 import streamlit as st
 
+from lib import idle
 from lib.auth import logout, resolve_actor
 from lib.config import get_settings
 from lib.models import NotAuthenticated
 from lib.nav import build_pages, render_dev_switcher
 from lib.request_id import init_logging
-from lib.state import clear_auth
+from lib.state import clear_auth, pop_logout_reason, set_logout_reason
 from lib.theme import inject_theme_js, init_theme_state, load_css
 from lib.topbar import render_topbar
 
@@ -35,20 +36,36 @@ if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.j
     )
     st.stop()
 
-# ④′ 登出偵測(TopBar <a href="?logout=1">;必須在 resolve_actor 之後,
-#     確保 bff 模式 CSRF token 已寫入 session_state,見 logout.md §3)
+# ④″ 閒置登出原因提示(只顯示一次;須在 actor 解析後、登出偵測前,見 idle-timeout §7.1)
+if pop_logout_reason() == "idle":
+    st.toast("因閒置逾 15 分鐘，已登出", icon="⏱️")
+
+# ④′ 登出偵測(TopBar <a href="?logout=1">;閒置計時器另帶 reason=idle;必須在 resolve_actor
+#     之後,確保 bff 模式 CSRF token 已寫入 session_state,見 logout.md §3、idle-timeout §5)
 if st.query_params.get("logout") == "1":
+    reason = idle.parse_logout_reason(st.query_params.get("reason"))  # 白名單(僅顯示)
     logout()  # mock 清狀態;bff POST BFF logout + 清狀態(try/finally 最佳努力)
     _s = get_settings()
     if _s.use_mock:
+        if reason == "idle":
+            set_logout_reason("idle")  # 跨 rerun 存活,下一輪顯示 toast(idle-timeout §6.2)
         st.query_params.clear()  # mock 無登入頁:清 param 後 rerun 以預設角色重進
         st.rerun()
     else:
         _login_url = _s.bff_login_url
-        st.markdown(
-            f'<meta http-equiv="refresh" content="0; url={_login_url}">',
-            unsafe_allow_html=True,
-        )
+        if reason == "idle":
+            # 閒置:過場頁顯示原因 + 延時 3s 跳轉,讓訊息可見(idle-timeout §6.1)
+            st.info("因閒置逾 15 分鐘，已將您登出，正在導向登入頁…")
+            st.markdown(
+                f'<meta http-equiv="refresh" content="3; url={_login_url}">',
+                unsafe_allow_html=True,
+            )
+        else:
+            # 手動登出:即時跳轉(不受閒置規格拖慢)
+            st.markdown(
+                f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+                unsafe_allow_html=True,
+            )
         st.stop()
 
 if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
@@ -57,6 +74,7 @@ if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
 _cms_url = get_settings().bff_cms_url
 render_topbar(actor, cms_base_url=_cms_url, theme=st.session_state["theme"])  # ⑥ 自訂頂列
 inject_theme_js()  # ⑦ 注入 ThemeToggle JS（冪等；在 topbar DOM 後執行）
+idle.inject_idle_js()  # ⑦′ 注入閒置計時器 JS（冪等；純 client-side 偵測滑鼠/鍵盤）
 
 try:
     pages = build_pages(actor)  # ⑦ 依 actor.grade 動態組頁清單(見 §5)
