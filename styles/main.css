@@ -77,6 +77,11 @@
     color: rgba(15, 23, 42, 0.66);   /* ink-AA */
     transition: background-color 150ms ease;
 }
+/* icon 顏色需直接設在 stIconMaterial：Streamlit 對 DynamicIcon 傳
+ * color=fadedText60（設在 span 本身），繼承自 button 的顏色會被蓋掉 */
+[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
+    color: rgba(15, 23, 42, 0.66);   /* ink-AA */
+}
 [data-testid="stExpandSidebarButton"] button:hover {
     background-color: rgba(141, 173, 206, 0.15);  /* nav-hover */
 }
@@ -333,6 +338,11 @@ section[data-testid="stSidebar"] {
     background-color: rgba(141, 173, 206, 0.15);  /* nav-hover */
 }
 
+/* icon 顏色需直接設在 stIconMaterial（同 stExpandSidebarButton 註解） */
+[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"] {
+    color: rgba(15, 23, 42, 0.66);  /* ink-AA */
+}
+
 /* 調寬把手：透明底，hover 顯示 brand(#2563eb) 1px 細線（對齊 CmsSideNav 右緣拖曳條）
    ⚠ data-testid 版本異動風險 */
 [data-testid="stSidebarResizeHandle"] {
@@ -463,7 +473,8 @@ html[data-theme="dark"] [data-testid="stExpandSidebarButton"] {
     background: #151c2b;                              /* surface-card */
 }
 
-html[data-theme="dark"] [data-testid="stExpandSidebarButton"] button {
+html[data-theme="dark"] [data-testid="stExpandSidebarButton"] button,
+html[data-theme="dark"] [data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] {
     color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
 }
 
@@ -510,7 +521,8 @@ html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"] sp
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
 }
 
-html[data-theme="dark"] [data-testid="stSidebarCollapseButton"] button {
+html[data-theme="dark"] [data-testid="stSidebarCollapseButton"] button,
+html[data-theme="dark"] [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"] {
     color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
 }
 

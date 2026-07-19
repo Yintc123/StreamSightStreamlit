@@ -234,3 +234,67 @@ def test_inject_theme_js_always_includes_force_light(monkeypatch):
     """兩種模式都保留 _FORCE_LIGHT_JS（鎖 Streamlit 內建元件為 light）。"""
     assert "stActiveTheme" in _capture_injected_html(monkeypatch, enable_theme_toggle=True)
     assert "stActiveTheme" in _capture_injected_html(monkeypatch, enable_theme_toggle=False)
+
+
+# ── 側欄收合 / 展開按鈕 icon 顏色（main.css）───────────────────────────────────
+# Streamlit 1.50 對按鈕內的 DynamicIcon 傳入 color=fadedText60，顏色直接設在
+# icon span（stIconMaterial）本身；只設在 button 的顏色無法靠繼承生效，
+# 深色底下 icon 會維持深灰而看不見。故 light / dark 都需直接覆寫 span。
+
+
+def _read_main_css() -> str:
+    from pathlib import Path
+
+    return (Path(__file__).resolve().parents[2] / "styles" / "main.css").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_css_sets_collapse_icon_color_on_icon_span():
+    """light：收合按鈕 icon span 需直接設 ink-AA（對齊 CmsSideNav text-ink-AA）。"""
+    import re
+
+    m = re.search(
+        r'^\[data-testid="stSidebarCollapseButton"\] \[data-testid="stIconMaterial"\]'
+        r"[^{]*\{[^}]*color:\s*rgba\(15, 23, 42, 0\.66\)",
+        _read_main_css(),
+        re.MULTILINE,
+    )
+    assert m, "main.css 缺少 light 模式收合按鈕 stIconMaterial 顏色覆寫"
+
+
+def test_dark_css_sets_collapse_icon_color_on_icon_span():
+    """dark：收合按鈕 icon span 需直接設深色 ink-AA，否則深色底看不到。"""
+    import re
+
+    m = re.search(
+        r'html\[data-theme="dark"\] \[data-testid="stSidebarCollapseButton"\] '
+        r'\[data-testid="stIconMaterial"\][^{]*\{[^}]*color:\s*rgba\(230, 237, 246, 0\.72\)',
+        _read_main_css(),
+    )
+    assert m, "main.css 缺少 dark 模式收合按鈕 stIconMaterial 顏色覆寫"
+
+
+def test_css_sets_expand_icon_color_on_icon_span():
+    """light：展開按鈕（stExpandSidebarButton）icon span 需直接設 ink-AA。"""
+    import re
+
+    m = re.search(
+        r'^\[data-testid="stExpandSidebarButton"\] \[data-testid="stIconMaterial"\]'
+        r"[^{]*\{[^}]*color:\s*rgba\(15, 23, 42, 0\.66\)",
+        _read_main_css(),
+        re.MULTILINE,
+    )
+    assert m, "main.css 缺少 light 模式展開按鈕 stIconMaterial 顏色覆寫"
+
+
+def test_dark_css_sets_expand_icon_color_on_icon_span():
+    """dark：展開按鈕 icon span 需直接設深色 ink-AA。"""
+    import re
+
+    m = re.search(
+        r'html\[data-theme="dark"\] \[data-testid="stExpandSidebarButton"\] '
+        r'\[data-testid="stIconMaterial"\][^{]*\{[^}]*color:\s*rgba\(230, 237, 246, 0\.72\)',
+        _read_main_css(),
+    )
+    assert m, "main.css 缺少 dark 模式展開按鈕 stIconMaterial 顏色覆寫"
