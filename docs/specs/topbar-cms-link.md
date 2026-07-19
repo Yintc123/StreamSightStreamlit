@@ -75,7 +75,7 @@ target: N || "_blank"   // N = 元素的 target 屬性；未設則強制 _blank
 | `tests/unit/test_config.py` | 新增 1 個測試（§5） |
 | `tests/unit/test_topbar.py` | 新增 4 個測試（§5） |
 | `tests/app/test_app_skeleton.py` | 新增 1 個 app 層測試（§5） |
-| `styles/main.css` | 不變 |
+| `styles/main.css` | 新增雙類選擇器確保品牌 & 管理後台連結無底線（§6） |
 | `docs/specs/design-system.md` | 更新品牌 href 說明 |
 | `docs/specs/config.md` | 新增 `BFF_CMS_PATH` 欄位記錄 |
 
@@ -153,7 +153,25 @@ def test_topbar_cms_url_always_passed(monkeypatch):
 
 ---
 
-## 6. 不在本規格範圍
+## 6. 樣式注意事項
+
+### 連結無底線
+
+品牌與管理後台連結須明確消除底線。單類選擇器（`.ss-topbar__brand`，specificity 0,1,0）會被 Streamlit 全域的 `.stMarkdownContainer a`（0,1,1）覆蓋，故需用雙類選擇器提升至 0,2,0：
+
+```css
+.ss-topbar .ss-topbar__brand,
+.ss-topbar .ss-topbar__brand:hover,
+.ss-topbar .ss-topbar__brand:visited,
+.ss-topbar .ss-topbar__sysitem,
+.ss-topbar .ss-topbar__sysitem:hover {
+    text-decoration: none;
+}
+```
+
+---
+
+## 7. 不在本規格範圍
 
 - 深色模式 ThemeToggle 功能實作。
 - 登出按鈕 CSRF / BFF 流程。

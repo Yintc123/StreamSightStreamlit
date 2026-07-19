@@ -99,6 +99,15 @@
     font-size: 14px;
 }
 
+/* TopBar 內所有連結無底線（雙類 0,2,0 > Streamlit 全域 .stMarkdownContainer a 的 0,1,1）*/
+.ss-topbar .ss-topbar__brand,
+.ss-topbar .ss-topbar__brand:hover,
+.ss-topbar .ss-topbar__brand:visited,
+.ss-topbar .ss-topbar__sysitem,
+.ss-topbar .ss-topbar__sysitem:hover {
+    text-decoration: none;
+}
+
 /* 品牌：mr-2 text-[15px] font-bold text-ink-AAA */
 .ss-topbar__brand {
     margin-right: 8px;

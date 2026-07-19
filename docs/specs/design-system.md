@@ -192,13 +192,20 @@ CmsTopBar.tsx                       ss-topbar（對應 Streamlit）
     border-bottom: 1px solid rgba(15, 23, 42, 0.12);
     display: flex; align-items: center; gap: 8px; padding: 0 16px;
 }
-.ss-topbar__brand { font-size: 15px; font-weight: 700; color: #0f172a; }
+/* 無底線（雙類 0,2,0，覆蓋 Streamlit 全域 .stMarkdownContainer a 的 0,1,1） */
+.ss-topbar .ss-topbar__brand,
+.ss-topbar .ss-topbar__brand:hover,
+.ss-topbar .ss-topbar__brand:visited,
+.ss-topbar .ss-topbar__sysitem,
+.ss-topbar .ss-topbar__sysitem:hover { text-decoration: none; }
+.ss-topbar__brand { font-size: 15px; font-weight: 700; color: #0f172a; text-decoration: none; }
 .ss-topbar__accent { color: #2563eb; }
 .ss-topbar__sysitem {
     border-radius: 8px; padding: 0 12px; height: 32px;
     font-size: 14px; font-weight: 500; color: rgba(15,23,42,0.66);
+    text-decoration: none;
 }
-.ss-topbar__sysitem:hover { background-color: rgba(141,173,206,0.15); }
+.ss-topbar__sysitem:hover { background-color: rgba(141,173,206,0.15); text-decoration: none; }
 .ss-topbar__sysitem--active,
 .ss-topbar__sysitem--active:hover { background-color: rgba(37,99,235,0.12); color: #2563eb; }
 .ss-topbar__username { font-size: 12px; color: rgba(15,23,42,0.45); max-width: 40%; }
