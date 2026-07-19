@@ -97,3 +97,15 @@ def test_dev_switcher_absent_in_bff_mode(monkeypatch):
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not any(s.key == "dev_user" for s in at.selectbox)
+
+
+def test_topbar_rendered_in_app():
+    """mock 模式下，app 渲染出含 ss-topbar class 的頂列 HTML 區塊（app-skeleton §3）。
+
+    render_topbar 使用 st.markdown(unsafe_allow_html=True)，可由 at.markdown 驗證。
+    """
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not at.exception
+    markdowns = [m.value for m in at.markdown]
+    assert any("ss-topbar" in m for m in markdowns)

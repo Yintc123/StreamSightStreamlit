@@ -12,6 +12,7 @@ from lib.nav import build_pages, render_dev_switcher
 from lib.request_id import init_logging
 from lib.state import clear_auth
 from lib.theme import load_css
+from lib.topbar import render_topbar
 
 st.set_page_config(
     page_title="StreamSight",
@@ -35,9 +36,13 @@ if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.j
 if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
+_s2 = get_settings()
+_cms_url = f"{_s2.bff_base_url}/cms" if _s2.auth_mode == "bff" else ""
+render_topbar(actor, cms_base_url=_cms_url)  # ⑥ 自訂頂列（全模式）
+
 try:
-    pages = build_pages(actor)  # ⑥ 依 actor.grade 動態組頁清單
-    st.navigation(pages).run()  # ⑦ 交給 Streamlit 路由
+    pages = build_pages(actor)  # ⑦ 依 actor.grade 動態組頁清單(見 §5)
+    st.navigation(pages).run()  # ⑧ 交給 Streamlit 路由
 except NotAuthenticated:
     # session 失效(401×2)：清狀態 + 重導登入（error-handling §3、auth §5）
     clear_auth()

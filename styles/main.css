@@ -2,6 +2,213 @@
    原則:能用 config.toml 主題解決就不寫 CSS,此處僅版面 / 品牌層級最小微調。 */
 
 /* ============================================================
+ * Top Nav Bar — 對齊 StreamSightFrontend CmsTopBar
+ *
+ * 原始規格：CmsTopBar.tsx
+ *   <header className="flex items-center gap-2 border-b border-line
+ *                       bg-surface-card px-4 h-12 shrink-0">
+ *
+ * Token 對照（light mode，與 Frontend globals.css [data-theme="light"] 對齊）：
+ *   surface-card    #f1f5f9        secondaryBackgroundColor
+ *   line            rgba(15,23,42,0.12)
+ *   ink-AAA         #0f172a
+ *   ink-AA          rgba(15,23,42,0.66)
+ *   ink-A           rgba(15,23,42,0.45)
+ *   brand           #2563eb
+ *   brand-overlay   rgba(37,99,235,0.12)
+ *   nav-hover       rgba(141,173,206,0.15)
+ *
+ * ⚠ data-testid 選擇器屬 Streamlit 內部，升版後需回歸確認（設計系統 §風險）。
+ * ============================================================ */
+
+/* stHeader：壓縮為 height:0 並設 overflow:visible，而非 display:none。
+ * 原因：側欄收合後，Streamlit 把展開按鈕（stExpandSidebarButton）動態注入
+ * stHeader，若整個 stHeader display:none 展開按鈕也會消失、側欄永遠打不開。
+ * height:0 + overflow:visible 可讓 stHeader 不佔版面，又讓 fixed 子元素浮出。 */
+[data-testid="stHeader"] {
+    height: 0;
+    min-height: 0;
+    overflow: visible;
+    background: transparent;
+    border-bottom: none;
+    padding: 0;
+}
+
+/* stToolbar 同樣壓縮為 height:0 overflow:visible，不能用 display:none！
+ * stExpandSidebarButton 是 stToolbar 的子孫，若 stToolbar display:none
+ * 子孫也全部消失（CSS 規範），展開按鈕就無法顯示。 */
+[data-testid="stToolbar"] {
+    height: 0;
+    min-height: 0;
+    overflow: visible;
+    background: transparent;
+    padding: 0;
+}
+
+/* 隱藏 stToolbar 內不需要的工具列項目（stExpandSidebarButton 除外）。
+ * ⚠ stBaseButton-headerNoPadding 須限定在 stToolbar 內，
+ *   否則會連帶隱藏 stSidebarCollapseButton 內的同名按鈕（Streamlit 重用此 testid）。 */
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"],
+[data-testid="stBaseButton-header"],
+[data-testid="stToolbar"] [data-testid="stBaseButton-headerNoPadding"] {
+    display: none;
+}
+
+/* 側欄展開按鈕（stExpandSidebarButton）：側欄收合後由 Streamlit 動態注入 stHeader。
+ * 仿 CmsSideNav absolute left-2 top-2 z-10，以 position:fixed 定位至
+ * TopBar(48px) 下方 8px（= top-2 = 8px），靠左 8px（= left-2 = 8px）。
+ * ⚠ testid = stExpandSidebarButton（非 stSidebarExpandButton）；升版需回歸。 */
+[data-testid="stExpandSidebarButton"] {
+    position: fixed;
+    top: 56px;          /* TopBar(48px) + 8px（CmsSideNav top-2） */
+    left: 8px;
+    z-index: 999993;    /* > TopBar(999992) > sidebar(999991) */
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #f1f5f9;
+}
+[data-testid="stExpandSidebarButton"] button {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: rgba(15, 23, 42, 0.66);   /* ink-AA */
+    transition: background-color 150ms ease;
+}
+[data-testid="stExpandSidebarButton"] button:hover {
+    background-color: rgba(141, 173, 206, 0.15);  /* nav-hover */
+}
+
+/* TopBar 本體：fixed 全寬，z-index 高於側欄 */
+.ss-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999992;    /* Streamlit sidebar = 999991；需高於它才能覆蓋左側 */
+    height: 48px;
+    background-color: #f1f5f9;                      /* surface-card */
+    border-bottom: 1px solid rgba(15, 23, 42, 0.12); /* line */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+/* 品牌：mr-2 text-[15px] font-bold text-ink-AAA */
+.ss-topbar__brand {
+    margin-right: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;      /* ink-AAA */
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+/* Sight 強調色：text-brand */
+.ss-topbar__accent { color: #2563eb; }
+
+/* 系統切換 Nav 容器：gap-1(4px) */
+.ss-topbar__nav { display: flex; align-items: center; gap: 4px; }
+
+/* 系統切換 Tab 基底：rounded-lg px-3 h-8 text-sm font-medium
+   同時也用於登出按鈕（CmsTopBar 中兩者共用 systemClass） */
+.ss-topbar__sysitem {
+    border-radius: 8px;
+    padding: 0 12px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(15, 23, 42, 0.66);   /* ink-AA */
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background-color 150ms ease;
+}
+
+.ss-topbar__sysitem:hover {
+    background-color: rgba(141, 173, 206, 0.15);  /* nav-hover */
+    color: rgba(15, 23, 42, 0.66);
+    text-decoration: none;
+}
+
+/* active tab：bg-brand-overlay text-brand */
+.ss-topbar__sysitem--active,
+.ss-topbar__sysitem--active:hover {
+    background-color: rgba(37, 99, 235, 0.12);  /* brand-overlay */
+    color: #2563eb;                             /* brand */
+}
+
+/* 右側區域：ml-auto gap-2(8px) */
+.ss-topbar__right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 使用者名稱：text-xs text-ink-A truncate max-w-[40%] */
+.ss-topbar__username {
+    font-size: 12px;
+    color: rgba(15, 23, 42, 0.45);  /* ink-A */
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ThemeToggle：w-9(36px) h-9(36px) rounded-md(6px)
+   text-ink-AA hover:text-ink-AAA hover:bg-line */
+.ss-topbar__theme-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(15, 23, 42, 0.66);  /* ink-AA */
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 150ms ease, background-color 150ms ease;
+}
+
+.ss-topbar__theme-btn:hover {
+    color: #0f172a;                          /* ink-AAA */
+    background-color: rgba(15, 23, 42, 0.12); /* line / bg-line */
+}
+
+/* ── TopBar 佔位補償 ─────────────────────────────────────────
+ * stHeader(60px) 隱藏後，側欄與主內容須各下移 48px，
+ * 避免被 fixed TopBar 遮蓋。
+ * ⚠ data-testid 版本異動風險（同上）。
+ * ─────────────────────────────────────────────────────────── */
+
+/* 側欄內容整體下移（TopBar 高度補償），清除預設橫向 padding。
+ * 橫向 padding 改由各子區塊自行設定，以對齊 CmsSideNav px-3(12px) 規格。 */
+[data-testid="stSidebarContent"] {
+    padding-top: 48px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* 主內容區整體下移（stHeader 消失後頂端留白由此補回） */
+[data-testid="stMain"] {
+    padding-top: 48px;
+}
+
+/* ============================================================
  * 側邊欄 Nav — 對齊 StreamSightFrontend CmsSideNav (Spec 016 §4.2–4.3)
  *
  * 顏色值取自 Frontend globals.css [data-theme="light"]（Streamlit 側欄
@@ -21,6 +228,28 @@
 /* 移除側欄右側邊框（CmsSideNav 無 border，靠 surface 色差分隔） */
 section[data-testid="stSidebar"] {
     border-right: none;
+}
+
+/* Nav 容器：對齊 CmsSideNav nav.flex.flex-col.gap-0.5.px-3.py-3
+ * gap-0.5 = 2px（gap between items）、px-3 = 12px、py-3 = 12px
+ * stSidebarNav 預設 display:block，改為 flex column 才能設 gap。 */
+[data-testid="stSidebarNav"] {
+    display: flex !important;
+    flex-direction: column;
+    gap: 2px;          /* gap-0.5 */
+    padding: 12px;     /* px-3 py-3 */
+}
+
+/* stSidebarNavLinkContainer 是每個 nav item 的外框 <div>，Streamlit 預設有 2px
+ * 上下 padding 造成 32px 高（28px link + 4px），對齊前端需歸零。 */
+[data-testid="stSidebarNavLinkContainer"] {
+    padding: 0 !important;
+}
+
+/* Dev Switcher（mock 模式）對齊 12px 橫向 padding（stSidebarContent 已清 0） */
+[data-testid="stSidebarUserContent"] {
+    padding-left: 12px;
+    padding-right: 12px;
 }
 
 /* Nav 連結基底：h-7(28px) rounded-lg(8px) px-2(0.5rem) text-base font-normal */
@@ -50,19 +279,27 @@ section[data-testid="stSidebar"] {
     font-weight: 600;
 }
 
-/* 收合 / 展開按鈕：h-7(28px) w-7(28px) rounded-lg hover:bg-nav-hover
-   ⚠ data-testid 版本異動風險：Streamlit 升版後需回歸確認 */
-[data-testid="stSidebarCollapseButton"] button,
-[data-testid="stSidebarExpandButton"] button {
+/* 收合按鈕（stSidebarCollapseButton）：對齊 CmsSideNav always-visible collapse button。
+ * Streamlit 預設 visibility:hidden（僅 hover 顯示），前端是永遠可見，故覆蓋為 visible。
+ * Streamlit 共用 stBaseButton-headerNoPadding testid：需覆蓋 display（我們的 stToolbar
+ * 隔離規則不影響此處，但 Streamlit 自身可能設 display:none，故補 !important）。
+ * ⚠ data-testid 版本異動風險：Streamlit 升版後需回歸確認 */
+[data-testid="stSidebarCollapseButton"] {
+    visibility: visible !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button {
+    display: inline-flex !important;
+    visibility: visible !important;
     width: 28px;
     height: 28px;
     border-radius: 8px;
+    color: rgba(15, 23, 42, 0.66);  /* ink-AA */
     transition: background-color 150ms ease;
 }
 
-[data-testid="stSidebarCollapseButton"] button:hover,
-[data-testid="stSidebarExpandButton"] button:hover {
-    background-color: rgba(141, 173, 206, 0.15);
+[data-testid="stSidebarCollapseButton"] button:hover {
+    background-color: rgba(141, 173, 206, 0.15);  /* nav-hover */
 }
 
 /* 調寬把手：透明底，hover 顯示 brand(#2563eb) 1px 細線（對齊 CmsSideNav 右緣拖曳條）

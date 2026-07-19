@@ -103,7 +103,7 @@ class Actor:
 純邏輯 mock cookie / mock introspection,不打真後端;放 `tests/unit/test_auth.py`:
 
 ### mock 分支(骨架階段即可)
-1. `resolve_actor()` 無 `session_state["actor"]` → 回 `Actor("alice","user")` 並寫回。
+1. `resolve_actor()` 無 `session_state["actor"]` → 回 `Actor("alice","admin",grade="super_admin")` 並寫回（mock 種子預設 super_admin，確保初次開啟可看全部頁面）。
 2. `session_state["actor"]` 已設(如切換器選 admin)→ 原樣回傳。
 3. mock 下呼 `get_access_token()` → `RuntimeError`。
 
