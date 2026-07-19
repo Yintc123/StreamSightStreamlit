@@ -5,7 +5,7 @@ import streamlit as st
 
 from lib import errors
 from lib.api_client import ApiError
-from lib.models import PermissionDenied, RecordNotFound, ValidationError
+from lib.models import NotAuthenticated, PermissionDenied, RecordNotFound, ValidationError
 
 
 # --- to_user_message 純函式(error-handling §7 測 1–7) ---
@@ -52,6 +52,22 @@ def test_backend_packet_fallback_code_none_does_not_crash():
     view = errors.to_user_message(ApiError("x", status=503, request_id="st-2", code=None))
     assert view.level == "error"
     assert view.code is None
+
+
+def test_not_authenticated_reraises_from_to_user_message():
+    """NotAuthenticated 不翻成 ErrorView，直接 re-raise（error-handling §3）。"""
+    with pytest.raises(NotAuthenticated):
+        errors.to_user_message(NotAuthenticated())
+
+
+def test_not_authenticated_reraises_from_render_error(monkeypatch, fake_session):
+    """render_error 遇 NotAuthenticated 不呼 st.* 而是 re-raise。"""
+    called = []
+    for level in ("error", "warning", "info"):
+        monkeypatch.setattr(st, level, lambda msg, lvl=level: called.append(lvl))
+    with pytest.raises(NotAuthenticated):
+        errors.render_error(NotAuthenticated())
+    assert called == [], "render_error 不應呼叫任何 st.error/warning/info"
 
 
 # --- render_error 薄 UI 綁定 ---

@@ -33,8 +33,9 @@ _INTROSPECT_OK = {"user": {"name": "alice"}, "role": 1, "grade": "editor", "acce
 # --- resolve_actor mock 分支(auth §8 測 1–2;APP_ENV 預設 local → AUTH_MODE=mock) ---
 
 def test_resolve_actor_mock_defaults_alice_and_writes_back(fake_session):
+    """mock 預設身分為 alice/admin/super_admin（app-skeleton §4、auth §3）。"""
     a = auth.resolve_actor()
-    assert a == Actor("alice", "admin", grade="editor")
+    assert a == Actor("alice", "admin", grade="super_admin")
     assert fake_session["actor"] == a  # 預設寫回 session
 
 
@@ -219,3 +220,85 @@ def test_do_logout_bff_raises_when_csrf_missing(bff_mode, fake_session, monkeypa
     # csrf_token 不存在於 fake_session
     with pytest.raises(RuntimeError):
         auth._do_logout_bff()
+
+
+# --- BFF http.Client 連線池（api-client.md §31） ---
+
+def test_bff_http_client_is_shared_across_calls(bff_mode, fake_session, monkeypatch):
+    """_make_bff_client() 兩次呼叫的底層 httpx.Client 為同一實例（連線池共用）。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    c1 = auth._make_bff_client()
+    c2 = auth._make_bff_client()
+    assert c1._client is c2._client, "每次 rerun 應重用同一 httpx.Client 實例（連線池）"
+
+
+# --- introspection 快取(auth-flow §4.6) ---
+
+def test_cached_introspect_is_wrapped_with_cache_data():
+    """_cached_introspect は st.cache_data でラップされ .clear() メソッドを持つ��auth-flow §4.6）。"""
+    assert hasattr(auth, "_cached_introspect"), "auth に _cached_introspect が必要"
+    assert callable(getattr(auth._cached_introspect, "clear", None)), \
+        "_cached_introspect は st.cache_data でラップされ .clear() を持つ必要"
+
+
+def test_introspection_cached_for_same_cookie(bff_mode, monkeypatch, fake_session):
+    """同一 cookie では _introspect_raw を1回だけ呼ぶ（auth-flow §4.6）。"""
+    auth._cached_introspect.clear()
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    call_count = [0]
+
+    def counting_raw():
+        call_count[0] += 1
+        return _INTROSPECT_OK
+
+    monkeypatch.setattr(auth, "_introspect_raw", counting_raw)
+    auth.resolve_actor()
+    auth.resolve_actor()
+    assert call_count[0] == 1, "同じ cookie では BFF を1回だけ叩く（2回目はキャッシュ）"
+
+
+def test_introspection_cache_cleared_after_401(bff_mode, monkeypatch, fake_session):
+    """401 後にキャッシュがクリアされ、次回は BFF を再呼び出しする（auth-flow §4.6）。"""
+    auth._cached_introspect.clear()
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+
+    calls = []
+
+    def failing_raw():
+        calls.append("called")
+        raise NotAuthenticated("session 失効")
+
+    monkeypatch.setattr(auth, "_introspect_raw", failing_raw)
+
+    # 1st call: 401 → resolve_actor clears cache & returns None
+    result = auth.resolve_actor()
+    assert result is None
+    assert len(calls) == 1
+
+    # 2nd call: cache was cleared → _introspect_raw is called again
+    auth.resolve_actor()
+    assert len(calls) == 2, "キャッシュクリア後は BFF を再び呼ぶ"
+
+
+def test_introspection_cache_cleared_on_bff_logout(bff_mode, monkeypatch, fake_session):
+    """bff logout 後にキャッシュがクリアされる（auth-flow §4.6）。"""
+    _set_cookies(monkeypatch, {"streamsight_session": "raw"})
+    fake_session["csrf_token"] = "tok"
+    auth._cached_introspect.clear()
+
+    calls = [0]
+
+    def counting_raw():
+        calls[0] += 1
+        return _INTROSPECT_OK
+
+    monkeypatch.setattr(auth, "_introspect_raw", counting_raw)
+    monkeypatch.setattr(auth, "_do_logout_bff", lambda: None)
+
+    auth.resolve_actor()  # populates cache
+    assert calls[0] == 1
+
+    auth.logout()  # should clear cache
+
+    auth.resolve_actor()  # should re-call _introspect_raw
+    assert calls[0] == 2, "logout 後はキャッシュがクリアされ BFF を再び呼ぶ"

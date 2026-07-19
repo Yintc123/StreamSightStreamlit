@@ -5,10 +5,12 @@
 - introspection 是「拿/換 token」的來源;回 401 一律經 api_client._handle → NotAuthenticated。
 - resolve_actor(進站辨識):攔 NotAuthenticated → 清狀態 → 回 None(未登入為正常狀態)。
 - refresh_token(業務 reactive refresh):讓 NotAuthenticated 往上拋 → 業務呼叫失敗 → 導向登入。
-註:introspection 的 st.cache_data 短 TTL 快取(auth-flow §4.6)為後續強化,本版先不快取。
+快取策略(auth-flow §4.6):以 _cached_introspect(cookie_value) 包住 BFF 呼叫;
+TTL ≈ 30s；401/logout/refresh 後主動呼叫 _cached_introspect.clear()。
 """
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Optional
 
 import httpx
@@ -19,8 +21,8 @@ from lib.api_client import ApiClient
 from lib.config import get_settings
 from lib.models import Actor, NotAuthenticated
 
-# mock 種子預設身分(auth §3;供開發切換器覆寫)；系統為 admin-only，預設 editor grade
-_DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade="editor")
+# mock 種子預設身分（app-skeleton §4；供開發切換器覆寫）；super_admin 確保初次開啟即可看到所有頁面
+_DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade="super_admin")
 
 
 def resolve_actor() -> Optional[Actor]:
@@ -39,6 +41,7 @@ def resolve_actor() -> Optional[Actor]:
     try:
         data = _introspect()
     except NotAuthenticated:
+        _cached_introspect.clear()  # 401:舊快取失效(auth-flow §4.6)
         state.clear_auth()  # 進站辨識:未登入為正常狀態,清狀態回 None 導向 gate
         return None
     actor = Actor(data["user"]["name"], map_role(data["role"]), grade=data.get("grade"))
@@ -67,6 +70,7 @@ def refresh_token() -> str:
     """重呼 introspection 換新 token 並回寫;401 時讓 NotAuthenticated 往上拋(reactive refresh)。"""
     if get_settings().auth_mode == "mock":
         raise RuntimeError("AUTH_MODE=mock 無 token")
+    _cached_introspect.clear()  # refresh 前清舊快取,確保打到 BFF 取最新 token(auth-flow §4.6)
     data = _introspect()  # 401 → NotAuthenticated 傳播(不在此攔)
     state.set_token(data["accessToken"], data["expiresAt"])
     return data["accessToken"]
@@ -89,6 +93,7 @@ def logout() -> None:
     try:
         _do_logout_bff()
     finally:
+        _cached_introspect.clear()  # 登出後清快取(auth-flow §4.6)
         state.clear_auth()
 
 
@@ -106,8 +111,8 @@ def _do_logout_bff() -> None:
     )
 
 
-def _introspect() -> dict:
-    """打 BFF GET /api/auth/session(轉發 cookie),回身分 data;401 → NotAuthenticated。"""
+def _introspect_raw() -> dict:
+    """BFF introspection 的純 HTTP 呼叫（無快取）。應透過 _introspect() 使用。"""
     settings = get_settings()
     body = _make_bff_client().request(
         "GET", f"{settings.bff_base_url}{settings.bff_session_path}", auth="cookie"
@@ -115,17 +120,43 @@ def _introspect() -> dict:
     return body["data"]
 
 
-def _make_bff_client() -> ApiClient:
-    """建立帶 cookie 轉發的 BFF ApiClient(introspection / CSRF / logout 共用)。"""
-    settings = get_settings()
-    timeout = httpx.Timeout(
-        connect=settings.http_connect_timeout_seconds,
-        read=settings.http_read_timeout_seconds,
-        write=settings.http_read_timeout_seconds,
-        pool=settings.http_connect_timeout_seconds,
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_introspect(raw_cookie_value: str) -> dict:
+    """cookie 原值為 cache key；TTL ≈ 30s（config §3.7 introspection_cache_ttl_seconds）。
+    auth-flow §4.6：401/logout/refresh 後呼叫 .clear() 主動失效。
+    """
+    return _introspect_raw()
+
+
+def _introspect() -> dict:
+    """快取版 introspection；cookie 原值作為 cache key，401 → NotAuthenticated 傳播。"""
+    cookie = raw_cookie()
+    if cookie is None:
+        raise RuntimeError("_introspect called without a cookie; check raw_cookie() first")
+    return _cached_introspect(cookie)
+
+
+@lru_cache
+def _get_bff_http_client() -> httpx.Client:
+    """模組層級共用的 BFF httpx.Client（連線池）；lru_cache 確保整個 process 僅建立一次。"""
+    s = get_settings()
+    return httpx.Client(
+        timeout=httpx.Timeout(
+            connect=s.http_connect_timeout_seconds,
+            read=s.http_read_timeout_seconds,
+            write=s.http_read_timeout_seconds,
+            pool=s.http_connect_timeout_seconds,
+        )
     )
+
+
+def _make_bff_client() -> ApiClient:
+    """建立帶 cookie 轉發的 BFF ApiClient(introspection / CSRF / logout 共用)。
+    底層 httpx.Client 透過 _get_bff_http_client() 共用，避免每次 rerun 重建連線池。
+    """
+    settings = get_settings()
     return ApiClient(
-        client=httpx.Client(timeout=timeout),
+        client=_get_bff_http_client(),
         raw_cookie=raw_cookie,
         cookie_name=settings.session_cookie_name,
     )

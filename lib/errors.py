@@ -17,7 +17,7 @@ import streamlit as st
 
 from lib import state
 from lib.api_client import ApiError
-from lib.models import PermissionDenied, RecordNotFound, ValidationError
+from lib.models import NotAuthenticated, PermissionDenied, RecordNotFound, ValidationError
 
 Level = Literal["error", "warning", "info"]
 
@@ -31,7 +31,11 @@ class ErrorView:
 
 
 def to_user_message(exc: Exception) -> ErrorView:
-    """把被攔到的例外翻成 §3 的呈現契約。純函式,不碰 Streamlit。"""
+    """把被攔到的例外翻成 §3 的呈現契約。純函式,不碰 Streamlit。
+    NotAuthenticated 不產生 ErrorView——直接 re-raise，由 app.py 處理導向。
+    """
+    if isinstance(exc, NotAuthenticated):
+        raise exc
     if isinstance(exc, ValidationError):
         return ErrorView("error", f"欄位不合法:{exc}")
     if isinstance(exc, PermissionDenied):
@@ -52,7 +56,11 @@ def to_user_message(exc: Exception) -> ErrorView:
 
 
 def render_error(exc: Exception) -> None:
-    """薄 UI 綁定:依 level 呼 st.error/warning/info;ApiError 類寫 last_request_id。"""
+    """薄 UI 綁定:依 level 呼 st.error/warning/info;ApiError 類寫 last_request_id。
+    NotAuthenticated 直接 re-raise，由 app.py 清 session 後重導登入。
+    """
+    if isinstance(exc, NotAuthenticated):
+        raise exc
     view = to_user_message(exc)
     if view.request_id:
         state.set_last_request_id(view.request_id)

@@ -9,6 +9,7 @@ import streamlit as st
 
 from lib import state
 from lib.data_source import get_data_source
+from lib.errors import render_error
 from lib.import_utils import parse_csv_bytes, parse_json_bytes
 from lib.models import CATEGORIES, DEFAULT_SORT, RecordNotFound, ValidationError, can_edit, can_write
 from lib.ui import empty_state, pagination_controls
@@ -132,15 +133,21 @@ with list_tab:
     category = None if cat_val == "全部" else cat_val
     page = st.session_state.get("dm_page", 1)
 
-    result = ds.list_records(
-        page=page,
-        size=size,
-        category=category,
-        keyword=kw_val,
-        sort=_SORT_OPTIONS[sort_label],
-    )
+    try:
+        result = ds.list_records(
+            page=page,
+            size=size,
+            category=category,
+            keyword=kw_val,
+            sort=_SORT_OPTIONS[sort_label],
+        )
+    except Exception as exc:
+        render_error(exc)
+        result = None
 
-    if result.total == 0:
+    if result is None:
+        pass  # 錯誤已由 render_error 顯示，保留頁框可重試
+    elif result.total == 0:
         empty_state("目前範圍內沒有資料")
     else:
         header = st.columns([1, 3, 1, 1, 1, 2, 2, 1, 1], vertical_alignment="bottom")

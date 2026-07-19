@@ -10,30 +10,50 @@ import uuid
 from contextvars import ContextVar
 from typing import Callable, Mapping, Optional
 
-HEADER = "X-Request-ID"  # 預設;實際名稱可由 config 覆寫(§2)
 LOGGER_NAME = "streamsight.api"
 
 _current: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
 
-
-def new_request_id(prefix: str = "st", gen: Callable[[], uuid.UUID] = uuid.uuid4) -> str:
-    """產生關聯 ID,格式 '<prefix>-<uuid4 hex>';gen 可注入以利測試決定性。"""
-    return f"{prefix}-{gen().hex}"
+# 使用 sentinel 而非 None,使呼叫端仍可明確傳入字串
+_UNSET = object()
 
 
-def with_request_id(headers: Mapping, request_id: str, header: str = HEADER) -> dict:
+def _header() -> str:
+    """讀 config 取 request_id_header(延遲載入,避免模組層級 circular import)。"""
+    from lib.config import get_settings  # noqa: PLC0415
+    return get_settings().request_id_header
+
+
+def _prefix() -> str:
+    """讀 config 取 request_id_prefix(延遲載入)。"""
+    from lib.config import get_settings  # noqa: PLC0415
+    return get_settings().request_id_prefix
+
+
+def new_request_id(prefix: object = _UNSET, gen: Callable[[], uuid.UUID] = uuid.uuid4) -> str:
+    """產生關聯 ID,格式 '<prefix>-<uuid4 hex>';gen 可注入以利測試決定性。
+    prefix 未傳入時從 config.request_id_prefix 取得(預設 'st')。"""
+    p = _prefix() if prefix is _UNSET else prefix
+    return f"{p}-{gen().hex}"
+
+
+def with_request_id(headers: Mapping, request_id: str, header: object = _UNSET) -> dict:
     """回傳附上關聯 ID 的新 headers(不就地修改)。
+    header 未傳入時從 config.request_id_header 取得(預設 'X-Request-ID')。
     若已含該 header(大小寫不敏感)→ 沿用既有值、不覆寫。"""
+    h = _header() if header is _UNSET else header
     out = dict(headers)
-    if any(k.lower() == header.lower() for k in out):
+    if any(k.lower() == h.lower() for k in out):
         return out  # 沿用上游 ID,避免斷鏈
-    out[header] = request_id
+    out[h] = request_id
     return out
 
 
-def read_request_id(response_headers: Mapping, header: str = HEADER) -> Optional[str]:
-    """從 headers 以大小寫不敏感方式取回關聯 ID;無則 None。"""
-    target = header.lower()
+def read_request_id(response_headers: Mapping, header: object = _UNSET) -> Optional[str]:
+    """從 headers 以大小寫不敏感方式取回關聯 ID;無則 None。
+    header 未傳入時從 config.request_id_header 取得(預設 'X-Request-ID')。"""
+    h = _header() if header is _UNSET else header
+    target = h.lower()
     for key, value in response_headers.items():
         if key.lower() == target:
             return value

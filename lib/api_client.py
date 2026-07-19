@@ -146,6 +146,7 @@ class ApiClient:
         rid = new_request_id()
         set_current(rid)
         sent = with_request_id(headers, rid)
+        t0 = time.monotonic()
         try:
             kwargs: dict = {"headers": sent, "params": params}
             if json is not None:
@@ -153,7 +154,8 @@ class ApiClient:
             if self._timeout is not None:
                 kwargs["timeout"] = self._timeout
             resp = self._client.request(method, url, **kwargs)
-            self._log(rid, method, url, resp.status_code)
+            elapsed_ms = (time.monotonic() - t0) * 1000
+            self._log(rid, method, url, resp.status_code, elapsed_ms)
             return resp, rid
         except httpx.TimeoutException as exc:
             raise ApiError("請求逾時", status=None, request_id=rid) from exc
@@ -194,8 +196,8 @@ class ApiClient:
         base = self._retry_base * (self._retry_factor ** attempt)
         return base * random.uniform(0.5, 1.5)
 
-    def _log(self, rid: str, method: str, url: str, status: int) -> None:
-        # 只記 method / path(去 query)/ status / rid;絕不記 token / cookie / body
+    def _log(self, rid: str, method: str, url: str, status: int, elapsed_ms: float = 0.0) -> None:
+        # 只記 method / path(去 query)/ status / elapsed_ms / rid;絕不記 token / cookie / body
         path = httpx.URL(url).path
         level = (
             logging.INFO
@@ -207,7 +209,13 @@ class ApiClient:
         _logger.log(
             level,
             "api_call",
-            extra={"request_id": rid, "method": method, "path": path, "status": status},
+            extra={
+                "request_id": rid,
+                "method": method,
+                "path": path,
+                "status": status,
+                "elapsed_ms": round(elapsed_ms, 1),
+            },
         )
 
 

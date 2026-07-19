@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
@@ -40,6 +41,40 @@ def test_bff_no_actor_redirects_to_login(monkeypatch):
     titles = [t.value for t in at.title]
     assert "資料分析" not in titles
     # meta refresh 含 /login 路徑
+    markdowns = [m.value for m in at.markdown]
+    assert any("/login" in m for m in markdowns)
+
+
+def test_app_calls_init_logging_on_startup():
+    """app.py 啟動時呼叫 init_logging()，streamsight.api logger 掛上 _streamsight filter。
+    (request-id §4.2、app-skeleton §3 步驟 ②′)
+    """
+    logger = logging.getLogger("streamsight.api")
+    # 先清除，確保乾淨的測試起點
+    logger.filters = [f for f in logger.filters if not getattr(f, "_streamsight", False)]
+    assert not any(getattr(f, "_streamsight", False) for f in logger.filters)
+
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+
+    assert any(
+        getattr(f, "_streamsight", False) for f in logger.filters
+    ), "app.py 應在啟動時呼叫 init_logging()"
+
+
+def test_not_authenticated_during_nav_clears_and_redirects_to_login(monkeypatch):
+    """navigation 執行中拋出 NotAuthenticated 時，app.py 清 session 並重導登入（error-handling §3）。"""
+    from lib import nav
+    from lib.models import NotAuthenticated
+
+    def _raise(_actor):
+        raise NotAuthenticated()
+
+    monkeypatch.setattr(nav, "build_pages", _raise)
+
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not at.exception
     markdowns = [m.value for m in at.markdown]
     assert any("/login" in m for m in markdowns)
 

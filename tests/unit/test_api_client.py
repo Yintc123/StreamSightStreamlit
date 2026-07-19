@@ -232,6 +232,18 @@ def test_log_carries_request_id_without_secrets(caplog):
     assert "Bearer" not in blob and "tok" not in blob and "secret" not in blob
 
 
+def test_log_carries_elapsed_ms(caplog):
+    """log extra 含 elapsed_ms（api-client.md §119）。"""
+    import logging
+
+    caplog.set_level(logging.INFO, logger="streamsight.api")
+    make_client(json_handler(200, {})).request("GET", "http://test/records")
+    records = [r for r in caplog.records if r.name == "streamsight.api"]
+    assert records
+    assert hasattr(records[0], "elapsed_ms"), "log record 應含 elapsed_ms 欄位"
+    assert isinstance(records[0].elapsed_ms, (int, float)), "elapsed_ms 應為數值"
+
+
 # --- ApiDataSource ↔ REST 端點對應(§9 測 7) ---
 
 _RECORD_JSON = {

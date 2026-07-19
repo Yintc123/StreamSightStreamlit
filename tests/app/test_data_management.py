@@ -4,6 +4,7 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from lib.api_client import ApiError
 from lib.models import Actor
 
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
@@ -236,6 +237,32 @@ def test_import_tab_renders_without_error():
     """匯入分頁正常渲染（不 crash）。"""
     at = _open_data_management(Actor("alice", "user"))
     assert not at.exception
+
+
+def test_list_records_api_error_shows_error_not_crash(monkeypatch):
+    """list_records 失敗時頁面顯示 st.error，不 crash（03-data-management §錯誤處理）。"""
+    from lib import data_source as _ds_mod
+
+    class _FailDS:
+        def list_records(self, **kw):
+            raise ApiError("連線逾時", status=None, request_id="st-fail1")
+
+        def get_record(self, *a, **kw): ...
+        def create_record(self, *a, **kw): ...
+        def update_record(self, *a, **kw): ...
+        def delete_record(self, *a, **kw): ...
+        def bulk_create(self, *a, **kw): ...
+
+    monkeypatch.setattr(_ds_mod, "get_data_source", lambda: _FailDS())
+
+    at = AppTest.from_file(APP_PATH)
+    at.session_state["actor"] = Actor("alice", "admin", grade="editor")
+    at.run()
+    at.switch_page("pages/data_management.py")
+    at.run()
+
+    assert not at.exception
+    assert at.error
 
 
 def test_dev_switcher_switches_user_and_updates_button_state():

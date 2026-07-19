@@ -162,3 +162,59 @@ def test_bff_csrf_path_removed():
     """bff_csrf_path 已移除；csrfToken 改由 introspection 一併回傳(S7)。"""
     s = get_settings()
     assert not hasattr(s, "bff_csrf_path")
+
+
+# --- App meta 欄位(config §3.1) ---
+
+def test_app_meta_defaults():
+    """APP_NAME / APP_VERSION / APP_COMMIT 三個 meta 欄位有預設值(config §3.1)。"""
+    s = get_settings()
+    assert s.app_name == "StreamSight"
+    assert s.app_version == "0.0.0"
+    assert s.app_commit == ""
+
+
+# --- LOG_LEVEL 各環境預設(config §3.1、§4) ---
+
+def test_log_level_local_is_debug():
+    """local 環境 LOG_LEVEL 預設 DEBUG(config §4 矩陣)。"""
+    s = get_settings()
+    assert s.log_level == "DEBUG"
+
+
+def test_log_level_development_is_debug(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "development")
+    s = get_settings()
+    assert s.log_level == "DEBUG"
+
+
+def test_log_level_stage_is_info(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "stage")
+    monkeypatch.setenv("BFF_BASE_URL", "https://stage.example.com")
+    monkeypatch.setenv("FASTAPI_BASE_URL", "https://stage-api.example.com")
+    s = get_settings()
+    assert s.log_level == "INFO"
+
+
+def test_log_level_test_is_warning(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "test")
+    s = get_settings()
+    assert s.log_level == "WARNING"
+
+
+# --- Request ID 設定項(config §3.6) ---
+
+def test_request_id_config_defaults():
+    """REQUEST_ID_HEADER / REQUEST_ID_PREFIX 有預設值(config §3.6)。"""
+    s = get_settings()
+    assert s.request_id_header == "X-Request-ID"
+    assert s.request_id_prefix == "st"
+
+
+# --- Token / introspection 設定項(config §3.7) ---
+
+def test_token_auth_config_defaults():
+    """TOKEN_REFRESH_THRESHOLD_SECONDS / INTROSPECTION_CACHE_TTL_SECONDS 有預設值(config §3.7)。"""
+    s = get_settings()
+    assert s.token_refresh_threshold_seconds == 60
+    assert s.introspection_cache_ttl_seconds == 30

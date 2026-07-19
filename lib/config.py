@@ -30,6 +30,13 @@ class BaseAppSettings(BaseSettings):
     )
 
     app_env: AppEnv = AppEnv.LOCAL
+
+    # App meta(§3.1)
+    app_name: str = "StreamSight"
+    app_version: str = "0.0.0"
+    app_commit: str = ""
+    log_level: str = "DEBUG"  # 各環境子類覆寫;大寫(§3.1、§4)
+
     data_source: str = "mock"
     auth_mode: str = "mock"
 
@@ -49,6 +56,14 @@ class BaseAppSettings(BaseSettings):
     http_retry_max: int = 2  # 網路重試上限(僅 GET)
     http_retry_base_seconds: float = 0.2
     http_retry_factor: float = 2
+
+    # Request ID(§3.6)
+    request_id_header: str = "X-Request-ID"
+    request_id_prefix: str = "st"
+
+    # 認證 / token(§3.7)
+    token_refresh_threshold_seconds: int = 60
+    introspection_cache_ttl_seconds: int = 30
 
     @model_validator(mode="after")
     def _check_prod_guards(self) -> "BaseAppSettings":
@@ -93,6 +108,8 @@ class DevelopmentSettings(BaseAppSettings):
 class StageSettings(DevelopmentSettings):
     """預備環境:近正式守衛(後續 cycle 補)。"""
 
+    log_level: str = "INFO"
+
 
 class ProductionSettings(StageSettings):
     """正式:強制 HTTPS / 非 localhost / 禁 mock(後續 cycle 補)。"""
@@ -107,6 +124,8 @@ class TestSettings(BaseAppSettings):
         extra="ignore",
         env_ignore_empty=True,
     )
+
+    log_level: str = "WARNING"
 
 
 _ENV_MAP = {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import lib.models as _m
 from lib.models import Actor, Record, can_edit, can_write
 
 
@@ -87,3 +88,18 @@ def test_can_write_user_role_false():
 def test_can_write_none_grade_admin_true():
     """grade=None + admin → None != 'viewer' → 可寫（寬鬆預設）。"""
     assert can_write(Actor("admin", "admin", grade=None)) is True
+
+
+def test_can_edit_admin_delegates_to_can_write(monkeypatch):
+    """can_edit admin 分支必須委派 can_write，不得重寫字面條件（data-source §權限純函式）。"""
+    calls = []
+    original = _m.can_write
+
+    def spy(actor):
+        calls.append(actor)
+        return original(actor)
+
+    monkeypatch.setattr(_m, "can_write", spy)
+    admin = Actor("admin", "admin", grade="editor")
+    can_edit(_record(), admin)
+    assert calls == [admin], "can_edit admin 分支應透過 can_write(actor) 判斷，而非重寫字面條件"

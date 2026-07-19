@@ -7,7 +7,10 @@ import streamlit as st
 
 from lib.auth import resolve_actor
 from lib.config import get_settings
+from lib.models import NotAuthenticated
 from lib.nav import build_pages, render_dev_switcher
+from lib.request_id import init_logging
+from lib.state import clear_auth
 from lib.theme import load_css
 
 st.set_page_config(
@@ -16,6 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )  # ① 頁面設定(必須最先)
 load_css()  # ② 載入一次 CSS
+init_logging()  # ②′ 結構化 log 管線（冪等，掛 request-id filter）
 
 actor = resolve_actor()  # ③ 身分解析(mock/bff 單一出口)
 
@@ -31,5 +35,16 @@ if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.j
 if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
-pages = build_pages(actor)  # ⑥ 依 actor.grade 動態組頁清單
-st.navigation(pages).run()  # ⑦ 交給 Streamlit 路由
+try:
+    pages = build_pages(actor)  # ⑥ 依 actor.grade 動態組頁清單
+    st.navigation(pages).run()  # ⑦ 交給 Streamlit 路由
+except NotAuthenticated:
+    # session 失效(401×2)：清狀態 + 重導登入（error-handling §3、auth §5）
+    clear_auth()
+    _s = get_settings()
+    _login_url = f"{_s.bff_base_url}{_s.bff_login_path}"
+    st.markdown(
+        f'<meta http-equiv="refresh" content="0; url={_login_url}">',
+        unsafe_allow_html=True,
+    )
+    st.stop()

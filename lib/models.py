@@ -89,7 +89,7 @@ def can_edit(record: Record, actor: Actor) -> bool:
     - user → 只可編輯自己建立的記錄
     """
     if actor.role == "admin":
-        return actor.grade != "viewer"
+        return can_write(actor)
     return record.created_by == actor.username
 
 

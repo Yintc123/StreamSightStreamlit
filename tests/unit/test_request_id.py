@@ -4,6 +4,7 @@ import logging
 import uuid
 
 from lib import request_id
+from lib.config import get_settings
 
 
 # --- new_request_id(§6 測 1–3) ---
@@ -58,6 +59,24 @@ def test_set_and_get_current():
     assert request_id.get_current() == "st-ctx"
     request_id.set_current(None)
     assert request_id.get_current() is None
+
+
+# --- init_logging(冪等 + filter 注入 rid) ---
+
+# --- config 整合(request-id §2、request-id.md §31、config §3.6) ---
+
+def test_new_request_id_uses_config_prefix(monkeypatch):
+    """new_request_id() 預設前綴來自 config.request_id_prefix（request-id §2）。"""
+    monkeypatch.setenv("REQUEST_ID_PREFIX", "dash")
+    rid = request_id.new_request_id()
+    assert rid.startswith("dash-"), f"預期前綴 'dash-'，實際: {rid}"
+
+
+def test_with_request_id_uses_config_header(monkeypatch):
+    """with_request_id() 預設 header 名稱來自 config.request_id_header（request-id §2）。"""
+    monkeypatch.setenv("REQUEST_ID_HEADER", "X-Trace-ID")
+    out = request_id.with_request_id({}, "st-abc")
+    assert "X-Trace-ID" in out, f"預期 header 'X-Trace-ID'，實際 keys: {list(out.keys())}"
 
 
 # --- init_logging(冪等 + filter 注入 rid) ---
