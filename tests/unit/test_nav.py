@@ -106,14 +106,14 @@ def test_page_file_paths(capture_pages):
 # --- render_dev_switcher 純邏輯（app-skeleton §3⑤ / CLAUDE.md lib/ 需有 unit test） ---
 
 def test_dev_actor_options_cover_all_grades():
-    """_DEV_ACTORS 覆蓋規格三種 grade（int）：SUPER_ADMIN=100 / EDITOR=50 / VIEWER=0。"""
+    """_DEV_ACTORS 覆蓋四種 grade（int）：ROOT=999 / SUPER_ADMIN=100 / EDITOR=50 / VIEWER=0。"""
     grades = [a.grade for _, a in nav._DEV_ACTORS]
-    assert grades == [AdminRole.SUPER_ADMIN, AdminRole.EDITOR, AdminRole.VIEWER]
+    assert grades == [AdminRole.ROOT, AdminRole.SUPER_ADMIN, AdminRole.EDITOR, AdminRole.VIEWER]
 
 
-def test_dev_actor_count_is_three():
-    """開發切換器正好有 3 個使用者選項。"""
-    assert len(nav._DEV_ACTORS) == 3
+def test_dev_actor_count_is_four():
+    """開發切換器正好有 4 個使用者選項（Root / Super Admin / Editor / Viewer）。"""
+    assert len(nav._DEV_ACTORS) == 4
 
 
 def test_dev_actor_usernames_are_unique():

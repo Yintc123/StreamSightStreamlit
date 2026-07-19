@@ -13,8 +13,9 @@ from lib import state
 from lib.models import Actor, AdminRole
 
 # 開發用切換器選項(僅 mock;換真實 API 後移除)。見 data-source §開發用切換器。
-# grade 為 AdminRole 數值：SUPER_ADMIN=100 / EDITOR=50 / VIEWER=0
+# grade 為 AdminRole 數值：ROOT=999 / SUPER_ADMIN=100 / EDITOR=50 / VIEWER=0
 _DEV_ACTORS = [
+    ("Root",        Actor("root",   "admin", grade=AdminRole.ROOT)),
     ("Super Admin", Actor("admin",  "admin", grade=AdminRole.SUPER_ADMIN)),
     ("Editor",      Actor("editor", "admin", grade=AdminRole.EDITOR)),
     ("Viewer",      Actor("viewer", "admin", grade=AdminRole.VIEWER)),
