@@ -462,27 +462,42 @@ html[data-theme-ready] * {
 深色不再只蓋 TopBar / Sidebar——主內容區以 CSS 字面值對齊 Frontend `@theme` 深色 token
 （`styles/main.css`「主內容區（Main）」區塊）：
 
+> **文字類規則的 scope 用 `.stApp` 而非 `stMain`**：`st.dialog` 為 portal 不在
+> `stMain` 下，側欄 dev switcher 的 label 亦需涵蓋。僅連結與 hr 維持 `stMain`
+> scope（放寬會誤染 Sidebar Nav 連結色）。另注意兩個結構性陷阱（本輪實際踩過）：
+> ① Streamlit 對 label / nav link / selectbox 值的**內層 p/span/div** 設明確
+> textColor，僅靠外層繼承蓋不過，需明列內層；② 深色規則彼此的**特異度**要對齊
+> （如 active 需 ≥ inactive），值寫對仍會被蓋掉。
+
 | 對象 | 深色值（token） |
 |---|---|
 | `.stApp` 頁面底 / 文字 cascade | `#0b0f17`（surface-page）/ ink-AAA |
-| `stMain` h1–h6、Markdown p/li | ink-AAA `rgba(230,237,246,.95)` |
+| `.stApp` h1–h6、Markdown p/li、widget label（含內層 p/span） | ink-AAA `rgba(230,237,246,.95)` |
 | caption | ink-A `rgba(230,237,246,.45)` |
-| 連結 | `#38bdf8`（ink-link） |
-| hr / expander / table 邊框 | line `rgba(230,237,246,.12)` |
+| 連結（stMain / dialog） | `#38bdf8`（ink-link） |
+| hr / expander / table / st.form 邊框 | line `rgba(230,237,246,.12)` |
 | `stMetric` 卡片 | `#151c2b`（surface-card）＋ label ink-AA / value ink-AAA |
-| 次要按鈕 | surface-card 底＋line 框；hover brand `#22d3ee` |
+| 次要按鈕 / form 送出鈕 / download 鈕 / uploader 內按鈕 | surface-card 底＋line 框＋ink-AAA 字；hover brand `#22d3ee` |
 | 主要按鈕 | brand `#22d3ee` 底＋ink-on-brand `#06121a` 字；hover brand-400 `#38bdf8` |
-| 輸入框（BaseWeb input/textarea/select） | surface-card 底＋line 框＋ink-AAA 字；placeholder ink-A |
-| selectbox 下拉（popover listbox） | surface-card 底；option hover nav-hover |
-| 檔案上傳 dropzone | surface-card 底＋ink-AA 字 |
+| 輸入框（BaseWeb input/textarea/select） | surface-card 底＋line 框＋ink-AAA 字；placeholder ink-A；**內層 base-input/input 需透明化**（自帶白底）；focus 邊框 brand |
+| selectbox 顯示值（內層 div） | ink-AAA |
+| selectbox 下拉（popover listbox）/ date_input 日曆 | surface-card 底；option hover nav-hover |
+| `st.dialog` 面板 | surface-card 底＋line 框；Close 鈕 ink-AA |
+| `st.toast` | surface-card 底＋ink-AAA 字＋line 框 |
+| slider | thumb 值 / thumb brand `#22d3ee`；刻度 ink-A |
+| number_input 步進鈕 | surface-card 底＋ink-AA 字 |
+| 檔案上傳 dropzone（含說明文字） | surface-card 底＋ink-AA 字 |
 | tabs active / highlight | brand `#22d3ee`；tab-border line |
+| dataframe 懸浮工具列 | surface-card 底＋ink-AA |
+| vega-lite 圖表軸 / 圖例文字 | ink-AA（best-effort，CSS `fill` 蓋 SVG attribute） |
 
 字體則由 `config.toml` `font = "PingFang TC, Noto Sans TC, system-ui, sans-serif"`
 對齊 Frontend `--font-sans`（兩主題共用，Streamlit ≥1.46 支援自訂 stack）。
 
-**已知限制**：canvas 渲染元件（`st.dataframe` glide-data-grid、vega 圖表）無法以 CSS
-覆寫，維持 light；語義 alert（success/error/warning/info）沿用 Streamlit 配色；
-`config.toml` `base="light"` 不變（§11），未列於上表的元件內部仍為 light。
+**已知限制**：canvas 渲染元件（`st.dataframe` glide-data-grid、圖表**圖面本體**）無法
+以 CSS 覆寫，維持 light（軸文字已 best-effort 覆寫）；語義 alert（success/error/
+warning/info）沿用 Streamlit 配色；`config.toml` `base="light"` 不變（§11），
+未列於上表的元件內部仍為 light。
 ⚠ 本節大量使用 `data-testid` / `data-baseweb` 選擇器，Streamlit 升版需回歸。
 
 ---

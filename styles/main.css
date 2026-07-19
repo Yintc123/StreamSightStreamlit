@@ -537,18 +537,20 @@ html[data-theme="dark"] .stApp {
 }
 
 /* 標題：Streamlit 對 h1–h6 設有明確色（theme.textColor），需覆寫 */
-html[data-theme="dark"] [data-testid="stMain"] h1,
-html[data-theme="dark"] [data-testid="stMain"] h2,
-html[data-theme="dark"] [data-testid="stMain"] h3,
-html[data-theme="dark"] [data-testid="stMain"] h4,
-html[data-theme="dark"] [data-testid="stMain"] h5,
-html[data-theme="dark"] [data-testid="stMain"] h6 {
+/* scope 用 .stApp 而非 stMain：dialog 為 portal 不在 stMain 下，
+ * 側欄 dev switcher 亦需涵蓋（連結/hr 除外——會誤染側欄 nav） */
+html[data-theme="dark"] .stApp h1,
+html[data-theme="dark"] .stApp h2,
+html[data-theme="dark"] .stApp h3,
+html[data-theme="dark"] .stApp h4,
+html[data-theme="dark"] .stApp h5,
+html[data-theme="dark"] .stApp h6 {
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
 }
 
 /* Markdown 內文安全網（多數繼承 .stApp，個別元素 Streamlit 仍設明確色） */
-html[data-theme="dark"] [data-testid="stMain"] .stMarkdown p,
-html[data-theme="dark"] [data-testid="stMain"] .stMarkdown li {
+html[data-theme="dark"] .stApp .stMarkdown p,
+html[data-theme="dark"] .stApp .stMarkdown li {
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
 }
 
@@ -664,9 +666,9 @@ html[data-theme="dark"] [data-testid="stFormSubmitButton"] button:hover {
 /* widget 標籤與選項文字（selectbox / text_input / number_input 的 label、
  * radio / checkbox 選項）：Streamlit 對 label 內層 p/span 設明確 textColor
  * （light 黑字），僅靠 .stApp 繼承蓋不過，需明列（同 Sidebar Nav 的處理） */
-html[data-theme="dark"] [data-testid="stMain"] label,
-html[data-theme="dark"] [data-testid="stMain"] label p,
-html[data-theme="dark"] [data-testid="stMain"] label span {
+html[data-theme="dark"] .stApp label,
+html[data-theme="dark"] .stApp label p,
+html[data-theme="dark"] .stApp label span {
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
 }
 
@@ -723,6 +725,88 @@ html[data-theme="dark"] [data-testid="stTable"] table {
 html[data-theme="dark"] [data-testid="stTable"] th,
 html[data-theme="dark"] [data-testid="stTable"] td {
     border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+/* ── 元件掃描補遺（2026-07-19 全頁盤點，theme-toggle.md §7.6）────────────── */
+
+/* st.dialog 面板（編輯 / 刪除確認）：portal 不在 stMain 下，白底需獨立覆寫 */
+html[data-theme="dark"] div[role="dialog"] {
+    background-color: #151c2b;                        /* surface-card */
+    border: 1px solid rgba(230, 237, 246, 0.12);      /* line */
+}
+
+html[data-theme="dark"] div[role="dialog"] button[aria-label="Close"] {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] div[role="dialog"] a {
+    color: #38bdf8;                                   /* ink-link */
+}
+
+/* st.download_button（分析頁 Excel / CSV）：不在 .stButton 下，比照 secondary */
+html[data-theme="dark"] [data-testid="stDownloadButton"] button {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+html[data-theme="dark"] [data-testid="stDownloadButton"] button:hover {
+    border-color: #22d3ee;                            /* brand */
+    color: #22d3ee;
+}
+
+/* st.toast（portal 於右下） */
+html[data-theme="dark"] [data-testid="stToast"] {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    border: 1px solid rgba(230, 237, 246, 0.12);      /* line */
+}
+
+/* st.date_input 日曆彈層（popover 內 calendar，非 listbox） */
+html[data-theme="dark"] [data-baseweb="calendar"] {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* st.slider：thumb 值與刻度預設黑字；thumb 對齊 brand（cyan） */
+html[data-theme="dark"] [data-testid="stSliderThumbValue"] {
+    color: #22d3ee;                                   /* brand */
+}
+
+html[data-theme="dark"] [data-testid="stSliderTickBarMin"],
+html[data-theme="dark"] [data-testid="stSliderTickBarMax"] {
+    color: rgba(230, 237, 246, 0.45);                 /* ink-A */
+}
+
+html[data-theme="dark"] [data-testid="stSlider"] [role="slider"] {
+    background-color: #22d3ee;                        /* brand */
+}
+
+/* dataframe 懸浮工具列（搜尋 / 下載 icon 列） */
+html[data-theme="dark"] [data-testid="stElementToolbar"] {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+/* file uploader 內部 Browse files 按鈕與說明文字 */
+html[data-theme="dark"] [data-testid="stFileUploaderDropzone"] button {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+html[data-theme="dark"] [data-testid="stFileUploaderDropzoneInstructions"],
+html[data-theme="dark"] [data-testid="stFileUploaderDropzoneInstructions"] span,
+html[data-theme="dark"] [data-testid="stFileUploaderDropzoneInstructions"] small {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+/* vega-lite 圖表（altair / line_chart）軸與圖例文字：
+ * best-effort——vega 以 SVG attribute 設 fill，CSS property 可蓋過；
+ * 圖面本體（marks / 背景）不隨主題，維持已知限制 */
+html[data-theme="dark"] [data-testid="stVegaLiteChart"] svg text,
+html[data-theme="dark"] [data-testid="stArrowVegaLiteChart"] svg text {
+    fill: rgba(230, 237, 246, 0.72);                  /* ink-AA */
 }
 
 /* ── FOUC Guard + 平滑過渡 ───────────────────────────────────────────────── */
