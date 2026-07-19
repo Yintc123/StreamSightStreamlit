@@ -82,3 +82,18 @@ def test_not_authenticated_during_nav_clears_and_redirects_to_login(monkeypatch)
 # build_pages 的存取控制邏輯（user 無法取得 admin 頁）已由
 # tests/unit/test_nav.py::test_user_has_no_admin_page 覆蓋；
 # mock 模式所有 dev actor 均為 admin 型別，AppTest 無法重現 user 情境，故不重複。
+
+
+def test_dev_switcher_present_in_mock_mode():
+    """AUTH_MODE=mock：側邊欄有 key='dev_user' 切換器（app-skeleton §3⑤）。"""
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert any(s.key == "dev_user" for s in at.selectbox)
+
+
+def test_dev_switcher_absent_in_bff_mode(monkeypatch):
+    """AUTH_MODE=bff：未登入時立即 redirect，切換器不出現。"""
+    monkeypatch.setenv("AUTH_MODE", "bff")
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not any(s.key == "dev_user" for s in at.selectbox)
