@@ -628,6 +628,39 @@ html[data-theme="dark"] [data-baseweb="textarea"] textarea::placeholder {
     color: rgba(230, 237, 246, 0.45);                 /* ink-A */
 }
 
+/* 輸入框內層：BaseWeb base-input / input 自帶白底，會蓋掉容器深底
+ * → 近白的 ink-AAA 字打在白底上不可讀；內層透明化讓容器深底顯出 */
+html[data-theme="dark"] [data-baseweb="base-input"],
+html[data-theme="dark"] [data-baseweb="input"] input,
+html[data-theme="dark"] [data-baseweb="textarea"] textarea {
+    background-color: transparent;
+}
+
+/* focus：對齊 Frontend FormField focus:border-brand（深色 brand = cyan） */
+html[data-theme="dark"] [data-baseweb="input"]:focus-within,
+html[data-theme="dark"] [data-baseweb="textarea"]:focus-within,
+html[data-theme="dark"] [data-baseweb="select"] > div:focus-within {
+    border-color: #22d3ee;                            /* brand */
+}
+
+/* st.form 外框 */
+html[data-theme="dark"] [data-testid="stForm"] {
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+/* 表單送出按鈕（st.form_submit_button）：kind="secondaryFormSubmit" 且不在
+ * .stButton 底下，前述 secondary 規則蓋不到 → 比照 secondary 樣式 */
+html[data-theme="dark"] [data-testid="stFormSubmitButton"] button {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+html[data-theme="dark"] [data-testid="stFormSubmitButton"] button:hover {
+    border-color: #22d3ee;                            /* brand */
+    color: #22d3ee;
+}
+
 /* widget 標籤與選項文字（selectbox / text_input / number_input 的 label、
  * radio / checkbox 選項）：Streamlit 對 label 內層 p/span 設明確 textColor
  * （light 黑字），僅靠 .stApp 繼承蓋不過，需明列（同 Sidebar Nav 的處理） */
