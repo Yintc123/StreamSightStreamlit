@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 
 from lib.models import (
@@ -71,6 +71,8 @@ class MockDataSource:
         keyword: Optional[str] = None,
         sort: str = DEFAULT_SORT,
         include_deleted: bool = False,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
     ) -> Page:
         rows = self._records
         if not include_deleted:
@@ -80,6 +82,10 @@ class MockDataSource:
         if keyword:  # 空字串視同無篩選
             kw = keyword.lower()
             rows = [r for r in rows if kw in r.title.lower()]
+        if date_from is not None:
+            rows = [r for r in rows if r.created_at.date() >= date_from]
+        if date_to is not None:
+            rows = [r for r in rows if r.created_at.date() <= date_to]
         rows = self._sorted(rows, sort)
         total = len(rows)
         start = (page - 1) * size

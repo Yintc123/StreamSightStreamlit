@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import functools
+from datetime import date
 from typing import Optional, Protocol
 
 import streamlit as st
@@ -24,6 +25,8 @@ class DataSource(Protocol):
         keyword: Optional[str] = None,
         sort: str = DEFAULT_SORT,
         include_deleted: bool = False,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
     ) -> Page: ...
 
     def get_record(self, record_id: int) -> Record: ...

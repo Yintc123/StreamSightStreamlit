@@ -12,7 +12,6 @@ from lib.analytics import (
     agg_by_category,
     agg_stats,
     build_export_caption,
-    filter_by_date,
     make_excel_bytes,
     records_to_df,
     resample_series,
@@ -40,9 +39,14 @@ has_error = False
 try:
     ds = get_data_source()
     category_param = None if fp.category == "全部" else fp.category
-    result = ds.list_records(page=1, size=1000, category=category_param)
+    result = ds.list_records(
+        page=1,
+        size=5000,
+        category=category_param,
+        date_from=fp.date_from,
+        date_to=fp.date_to,
+    )
     df = records_to_df(result.items)
-    df = filter_by_date(df, fp.date_from, fp.date_to)
 except Exception as exc:
     render_error(exc)
     has_error = True

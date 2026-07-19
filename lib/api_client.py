@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import random
 import time
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Callable, Optional
 
 import httpx
@@ -264,6 +264,8 @@ class ApiDataSource:
         keyword: Optional[str] = None,
         sort: str = DEFAULT_SORT,
         include_deleted: bool = False,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
     ) -> Page:
         params: dict = {"page": page, "size": size, "sort": sort}
         if category:
@@ -272,6 +274,10 @@ class ApiDataSource:
             params["keyword"] = keyword
         if include_deleted:
             params["include_deleted"] = "true"
+        if date_from is not None:
+            params["date_from"] = date_from.isoformat()
+        if date_to is not None:
+            params["date_to"] = date_to.isoformat()
         data = self._c.request("GET", self._url("/records"), params=params)
         return Page(
             items=[_to_record(item) for item in data["items"]],

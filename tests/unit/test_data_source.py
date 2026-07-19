@@ -50,3 +50,36 @@ def test_api_datasource_shares_http_client_across_calls(monkeypatch, fake_sessio
     assert ds1._c is ds2._c
 
 
+# --- MockDataSource.list_records 日期篩選(api-records §4.1) ---
+
+def test_mock_list_records_filters_by_date_from():
+    """date_from → 只回傳 created_at.date() >= date_from 的記錄。"""
+    from datetime import date
+    from lib.mock_data_source import MockDataSource, make_seed_records
+    ds = MockDataSource(make_seed_records())
+    d = date(2026, 7, 1)
+    result = ds.list_records(size=300, date_from=d)
+    assert result.total > 0
+    for r in result.items:
+        assert r.created_at.date() >= d
+
+
+def test_mock_list_records_filters_by_date_to():
+    """date_to → 只回傳 created_at.date() <= date_to 的記錄。"""
+    from datetime import date
+    from lib.mock_data_source import MockDataSource, make_seed_records
+    ds = MockDataSource(make_seed_records())
+    d = date(2026, 5, 31)
+    result = ds.list_records(size=300, date_to=d)
+    assert result.total > 0
+    for r in result.items:
+        assert r.created_at.date() <= d
+
+
+def test_mock_list_records_no_date_params_returns_all_200():
+    """date_from=None, date_to=None → 回傳全部 200 筆種子（回歸）。"""
+    from lib.mock_data_source import MockDataSource, make_seed_records
+    ds = MockDataSource(make_seed_records())
+    assert ds.list_records(size=300).total == 200
+
+

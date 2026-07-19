@@ -7,8 +7,10 @@ from lib.config import AppEnv, get_settings
 
 # --- 行為 1 + 2:環境選類 + 各環境預設矩陣(config §1、§4) ---
 
-def test_default_env_is_local_use_mock_true():
-    """無 APP_ENV → 預設 local，USE_MOCK=True（§4 矩陣）。"""
+def test_default_env_is_local_use_mock_true(monkeypatch):
+    """APP_ENV=local + USE_MOCK=true → local 環境，use_mock=True（§4 矩陣；本機 .env 可覆寫，測試明確設定）。"""
+    monkeypatch.setenv("APP_ENV", "local")
+    monkeypatch.setenv("USE_MOCK", "true")
     s = get_settings()
     assert s.app_env == AppEnv.LOCAL
     assert s.use_mock is True
@@ -167,8 +169,9 @@ def test_app_meta_defaults():
 
 # --- LOG_LEVEL 各環境預設(config §3.1、§4) ---
 
-def test_log_level_local_is_debug():
-    """local 環境 LOG_LEVEL 預設 DEBUG(config §4 矩陣)。"""
+def test_log_level_local_is_debug(monkeypatch):
+    """APP_ENV=local → LOG_LEVEL 預設 DEBUG(config §4 矩陣)。"""
+    monkeypatch.setenv("APP_ENV", "local")
     s = get_settings()
     assert s.log_level == "DEBUG"
 

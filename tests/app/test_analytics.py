@@ -98,3 +98,49 @@ def test_trend_tab_has_granularity_radio():
     radios = [r for r in at.radio if r.label == "粒度"]
     assert radios
     assert list(radios[0].options) == ["時", "日", "週"]
+
+
+# 測試 12
+def test_analytics_passes_date_params_to_list_records():
+    """分析頁設定日期篩選 → list_records 被傳入 date_from / date_to（server-side 篩選）。"""
+    from datetime import date
+    from lib.mock_data_source import MockDataSource
+
+    at = _open_analytics(Actor("alice", "user"))
+    at.session_state["an_date_range"] = (date(2026, 6, 1), date(2026, 6, 30))
+
+    calls = []
+    orig = MockDataSource.list_records
+
+    def spy(self, *args, **kwargs):
+        calls.append(kwargs)
+        return orig(self, *args, **kwargs)
+
+    with patch("lib.mock_data_source.MockDataSource.list_records", spy):
+        at.run()
+
+    assert calls, "list_records 未被呼叫"
+    assert calls[0].get("date_from") == date(2026, 6, 1), "date_from 未傳給 list_records"
+    assert calls[0].get("date_to") == date(2026, 6, 30), "date_to 未傳給 list_records"
+
+
+# 測試 13
+def test_analytics_no_date_passes_none_to_list_records():
+    """無日期篩選 → list_records 帶 date_from=None, date_to=None（回歸）。"""
+    from lib.mock_data_source import MockDataSource
+
+    at = _open_analytics(Actor("alice", "user"))
+
+    calls = []
+    orig = MockDataSource.list_records
+
+    def spy(self, *args, **kwargs):
+        calls.append(kwargs)
+        return orig(self, *args, **kwargs)
+
+    with patch("lib.mock_data_source.MockDataSource.list_records", spy):
+        at.run()
+
+    assert calls
+    assert calls[0].get("date_from") is None
+    assert calls[0].get("date_to") is None

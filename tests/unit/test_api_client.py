@@ -328,3 +328,58 @@ def test_bulk_create_parses_import_result():
     assert isinstance(result, ImportResult)
     assert result.created == 2
     assert result.errors[0].row_index == 3 and result.errors[0].reason == "bad"
+
+
+# --- ApiDataSource.list_records 日期參數(api-records §4.1) ---
+
+def test_list_records_sends_date_from_to_backend():
+    """date_from → GET /records 查詢帶 date_from=YYYY-MM-DD。"""
+    from datetime import date
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={"items": [], "total": 0, "page": 1, "size": 20})
+
+    make_ds(handler).list_records(date_from=date(2026, 7, 1))
+    assert "date_from=2026-07-01" in captured["url"]
+
+
+def test_list_records_sends_date_to_to_backend():
+    """date_to → GET /records 查詢帶 date_to=YYYY-MM-DD。"""
+    from datetime import date
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={"items": [], "total": 0, "page": 1, "size": 20})
+
+    make_ds(handler).list_records(date_to=date(2026, 7, 31))
+    assert "date_to=2026-07-31" in captured["url"]
+
+
+def test_list_records_omits_date_params_when_none():
+    """date_from=None, date_to=None → 查詢不帶 date_from / date_to（回歸：不傳空值給後端）。"""
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={"items": [], "total": 0, "page": 1, "size": 20})
+
+    make_ds(handler).list_records()
+    assert "date_from" not in captured["url"]
+    assert "date_to" not in captured["url"]
+
+
+def test_list_records_analytics_size_5000_with_date():
+    """size=5000 + date_from → 查詢帶 size=5000（analytics 大批量，後端用 analytics_max）。"""
+    from datetime import date
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={"items": [], "total": 0, "page": 1, "size": 5000})
+
+    make_ds(handler).list_records(size=5000, date_from=date(2026, 1, 1))
+    assert "size=5000" in captured["url"]
+    assert "date_from=2026-01-01" in captured["url"]

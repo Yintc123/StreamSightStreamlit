@@ -25,9 +25,14 @@ def _clear_settings_cache() -> None:
 
 @pytest.fixture(autouse=True)
 def _isolate_config_env(monkeypatch):
-    """每個測試前清掉設定相關 env 與 get_settings 快取，避免跨測試污染。"""
+    """每個測試前清掉設定相關 env 與 get_settings 快取，避免跨測試污染。
+
+    設 APP_ENV=test 使 TestSettings 生效（env_file=None + use_mock=True），
+    隔絕本機 .env（如 USE_MOCK=false）對測試的影響。
+    """
     for key in _CONFIG_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("APP_ENV", "test")
     _clear_settings_cache()
     yield
     _clear_settings_cache()
