@@ -57,6 +57,22 @@ def test_landing_defaults_to_recent_7_day_window():
     assert (to - frm).days == 7
 
 
+# 測試 8c：日期 widget 不得觸發「default value + Session State API」重複警告
+def test_landing_shows_no_widget_state_duplication_warning():
+    """落地預設區間以 setdefault 植入時，date_input 不得再帶 default value，
+    否則 Streamlit 會顯示 'The widget with key "an_date_range" was created with
+    a default value but also had its value set via the Session State API.'
+    （該警告每個 server process 只顯示一次，故需先重置全域旗標以穩定重現。）
+    """
+    import streamlit.elements.lib.policies as policies
+
+    policies._shown_default_value_warning = False
+    at = _open_analytics(Actor("alice", "user"))
+    assert not at.exception
+    dup_warnings = [w for w in at.warning if "an_date_range" in w.value]
+    assert not dup_warnings, f"出現 widget state 重複警告：{[w.value for w in dup_warnings]}"
+
+
 # 測試 9
 def test_empty_data_shows_info_and_no_metrics():
     """無資料（空記錄集）→ 含 st.info 空狀態，統計指標卡不渲染。

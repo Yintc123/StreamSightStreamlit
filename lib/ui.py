@@ -177,7 +177,13 @@ def filter_bar(
             # st.date_input range 模式只支援單一 key，故使用 {prefix}_date_range 作為
             # widget binding key（內部實作細節）；解析後同步寫入 spec §7 所列的
             # {prefix}_date_from / {prefix}_date_to，供呼叫端讀取 FilterParams 用。
-            date_range = st.date_input("時間範圍", value=[], key=f"{key_prefix}_date_range")
+            # session 已有值（setdefault 植入或 widget 既有狀態）時不得再帶 value=，
+            # 否則 Streamlit 會警告 default value 與 Session State API 重複設值；
+            # 省略 value 時 range 模式會由 session 值自動推斷。
+            if range_key in st.session_state:
+                date_range = st.date_input("時間範圍", key=range_key)
+            else:
+                date_range = st.date_input("時間範圍", value=[], key=range_key)
         col_idx += 1
         if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
             date_from, date_to = date_range[0], date_range[1]
