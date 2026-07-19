@@ -66,6 +66,15 @@ class BaseAppSettings(BaseSettings):
     token_refresh_threshold_seconds: int = 60
     introspection_cache_ttl_seconds: int = 30
 
+    @property
+    def fastapi_ws_url(self) -> str:
+        """http(s) → ws(s)；先換 https，再換 http，避免 https 雙重替換。"""
+        return (
+            self.fastapi_base_url
+            .replace("https://", "wss://")
+            .replace("http://", "ws://")
+        )
+
     @model_validator(mode="after")
     def _check_prod_guards(self) -> "BaseAppSettings":
         # §5.3:stage / production 的 base URL 必須 HTTPS 且非 localhost。

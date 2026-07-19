@@ -228,3 +228,27 @@ def test_enable_theme_toggle_can_be_set_true(monkeypatch):
     s = get_settings()
     assert s.enable_theme_toggle is True
 
+
+# --- fastapi_ws_url property（config §2） ---
+
+def test_fastapi_ws_url_http(monkeypatch):
+    """http:// → ws://"""
+    monkeypatch.setenv("FASTAPI_BASE_URL", "http://localhost:3001")
+    assert get_settings().fastapi_ws_url == "ws://localhost:3001"
+
+
+def test_fastapi_ws_url_https(monkeypatch):
+    """https:// → wss://"""
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("FASTAPI_BASE_URL", "https://api.example.com")
+    assert get_settings().fastapi_ws_url == "wss://api.example.com"
+
+
+def test_fastapi_ws_url_no_double_replace(monkeypatch):
+    """https:// 不可被替換成 wsss://（雙重替換 bug）。"""
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("FASTAPI_BASE_URL", "https://api.example.com")
+    result = get_settings().fastapi_ws_url
+    assert result.startswith("wss://")
+    assert "wsss" not in result
+

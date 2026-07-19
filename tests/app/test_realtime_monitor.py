@@ -1,10 +1,12 @@
 """pages/realtime_monitor.py 頁面行為 AppTest。
 
-見規格 docs/specs/pages/04-realtime-monitor.md §可測試性/TDD（測試 14–17）。
+見規格 docs/specs/pages/04-realtime-monitor.md §可測試性/TDD（測試 14–17）
+與 docs/specs/pages/04-realtime-ws-client.md §10.2（測試 23–25）。
+
 採 render-then-sample 執行序：首幀渲染依「進入該幀時的 rt_buffer」，故注入 rt_buffer
 即可決定首幀畫面，無需 monkeypatch 生成器；閾值以注入 rt_threshold 控制。
 
-註：st.fragment(run_every=1.0) 在 AppTest 下只執行首幀、不自動循環，故只測首幀行為。
+AppTest 從 app.py 進入再 switch_page；use_mock=False 時需 patch resolve_actor 繞過 BFF。
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from lib.models import Actor, AdminRole
 from lib.realtime import Reading
 
 APP_PATH = str(Path(__file__).resolve().parents[2] / "app.py")
+RT_PATH = str(Path(__file__).resolve().parents[2] / "pages" / "realtime_monitor.py")
 
 _TZ = timezone(timedelta(hours=8))
 _NOW = datetime(2026, 7, 19, 12, 0, 3, tzinfo=_TZ)
@@ -69,6 +72,82 @@ def test_over_threshold_renders_toast():
 # 測試 17：空 / 未預設 rt_buffer（首幀緩衝為空）→ 含 empty_state st.info，不渲染指標卡
 def test_empty_buffer_shows_empty_state_and_no_metrics():
     at = _open_monitor(Actor("alice", "user"), rt_buffer=[])
+    assert not at.exception
+    assert any("串流啟動中" in i.value for i in at.info)
+    assert len(at.metric) == 0
+
+
+# ── 測試 23–25：use_mock=False（WS client 路徑）────────────────────────────────
+#
+# use_mock=False 時，resolve_actor() 走 BFF（session_state["actor"] 被忽略）。
+# _open_monitor_api：patch lib.auth.resolve_actor 繞過 BFF；page 的 require_auth()
+# 讀 state.get_actor()（session_state["actor"]），由 _open_monitor_api 注入即可通過。
+
+
+class _MockWsClient:
+    """注入用的假 WsClient；不啟動執行緒，不連真實後端。"""
+
+    def __init__(self, buffer=None, last_error=None):
+        self._buf = buffer or []
+        self._last_error = last_error
+        self.started = False
+
+    def start(self): self.started = True
+    def stop(self): pass
+
+    @property
+    def buffer(self): return list(self._buf)
+
+    @property
+    def last_error(self): return self._last_error
+
+
+def _open_monitor_api(actor: Actor, monkeypatch, **state) -> AppTest:
+    """use_mock=False AppTest helper：直接測頁面，繞過 app.py auth dance。
+
+    require_auth() 在 use_mock=False + session_state["actor"] 已設時自動通過。
+    不需穿越 app.py 的 BFF resolve_actor 邏輯。
+    """
+    monkeypatch.setenv("USE_MOCK", "false")
+    at = AppTest.from_file(RT_PATH)
+    at.session_state["actor"] = actor
+    for key, value in state.items():
+        at.session_state[key] = value
+    at.run()
+    return at
+
+
+# 測試 23：WS buffer 有資料 → 顯示指標卡，不顯示 empty_state
+def test_ws_buffer_with_data_shows_metrics(monkeypatch):
+    at = _open_monitor_api(
+        Actor("alice", "admin", grade=AdminRole.VIEWER),
+        monkeypatch,
+        rt_ws_client=_MockWsClient(buffer=[Reading(ts=_NOW, value=42.0)]),
+    )
+    assert not at.exception
+    assert len(at.metric) >= 4
+    assert not any("串流啟動中" in i.value for i in at.info)
+
+
+# 測試 24：WS last_error 有值 → 顯示 st.error，不渲染指標卡
+def test_ws_last_error_shows_error_no_metrics(monkeypatch):
+    at = _open_monitor_api(
+        Actor("alice", "admin", grade=AdminRole.VIEWER),
+        monkeypatch,
+        rt_ws_client=_MockWsClient(last_error="connection refused"),
+    )
+    assert not at.exception
+    assert at.error
+    assert len(at.metric) == 0
+
+
+# 測試 25：WS buffer 為空、last_error 為 None → 顯示 empty_state，不渲染指標卡
+def test_ws_empty_buffer_shows_empty_state(monkeypatch):
+    at = _open_monitor_api(
+        Actor("alice", "admin", grade=AdminRole.VIEWER),
+        monkeypatch,
+        rt_ws_client=_MockWsClient(buffer=[], last_error=None),
+    )
     assert not at.exception
     assert any("串流啟動中" in i.value for i in at.info)
     assert len(at.metric) == 0
