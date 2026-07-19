@@ -68,6 +68,10 @@ font = "sans serif"
 > 系統偏好的使用者會看到整站變暗。本應用**只支援白天模式**，以 `base = "light"`
 > 明確鎖定（有 `tests/unit/test_theme.py::test_config_toml_forces_light_base`
 > 迴歸護欄）。
+>
+> 此處僅鎖定 Streamlit 底層元件；自訂 CSS 層的主題與整體應用最終主題（含
+> `ENABLE_THEME_TOGGLE` flag 分支、前後端預設對照）見
+> [ThemeToggle 規格 §1.1](theme-toggle.md#11-預設主題解析依-enable_theme_toggle)。
 
 ## CSS 載入方式
 

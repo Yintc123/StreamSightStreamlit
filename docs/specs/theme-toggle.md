@@ -18,7 +18,7 @@ TopBar 右側的圖示按鈕，切換 Streamlit 自訂 CSS 層的顯示主題（
 | 面向 | StreamSightFrontend | Streamlit（目前） |
 |---|---|---|
 | 元件 | `ThemeToggle.tsx` | `lib/topbar.py` + `lib/theme.py` |
-| 預設主題 | `dark` | `light`（暫時固定） |
+| 預設主題 | flag off → `light`（硬編碼）；flag on → cookie，缺省 `dark`（見 §1.1） | `light`（暫時固定；見 §1.1） |
 | 圖示邏輯 | `isLight` → 太陽；`!isLight` → 月亮 | 同（SVG 已實作，按 `theme` 參數選圖） |
 | 按鈕狀態 | 可點擊 | `disabled`（功能待啟用） |
 | `aria-pressed` | `isLight`（`"true"/"false"`） | 未使用（按鈕 disabled） |
@@ -26,12 +26,35 @@ TopBar 右側的圖示按鈕，切換 Streamlit 自訂 CSS 層的顯示主題（
 | Cookie 名稱 | `theme` | `theme` |
 | Cookie Max-Age | 31,536,000 秒（1 年） | 同 |
 | Cookie SameSite | `Lax` | 同 |
-| 未知值收斂 | `dark` | `light` |
+| 未知值收斂 | `dark`（僅 flag on 的 cookie 解析路徑） | `light` |
 | FOUC guard | `data-theme-ready` mount 後掛上 | 同（JS 注入後掛） |
 | 過渡動畫 | 150ms ease（color / bg / border） | 同 |
 | `prefers-reduced-motion` | `transition: none !important` | 同 |
 | dark token 來源 | `globals.css` `@theme` | `main.css` `html[data-theme="dark"]` |
 | light token 來源 | `globals.css` `html[data-theme="light"]` | `main.css`（現有字面值） |
+
+### 1.1 預設主題解析（依 `ENABLE_THEME_TOGGLE`）
+
+Frontend 於 `src/app/layout.tsx` 依 flag 分兩條路徑；未知 / 缺省值收斂見
+`src/lib/theme/schema.ts` `parseTheme`（收斂到 `dark`）。
+
+```typescript
+// StreamSightFrontend/src/app/layout.tsx
+const theme =
+  process.env.NEXT_PUBLIC_ENABLE_THEME_TOGGLE === '1'
+    ? await readThemeCookie()   // cookie 缺省 / 未知 → parseTheme 收斂 'dark'
+    : 'light';                  // 切換關閉 → 硬編碼 light
+```
+
+| 情境 | StreamSightFrontend | Streamlit（目前） |
+|---|---|---|
+| flag 關閉（`!= '1'`，**目前預設**） | `'light'`（`layout.tsx` 硬編碼） | `'light'`（`init_theme_state` 固定） |
+| flag 開啟、有 cookie | cookie 值（`'light'` / `'dark'`） | 待實作（目前仍固定 `'light'`） |
+| flag 開啟、無 cookie / 未知值 | `'dark'`（`parseTheme` 收斂） | 待實作（目前仍固定 `'light'`） |
+
+> **目前兩端一致**：`ENABLE_THEME_TOGGLE=0` 下 Frontend 與 Streamlit 皆渲染 `light`。
+> 差異僅在「未來啟用切換」時浮現——屆時需決定 Streamlit 無 cookie 是否比照 Frontend
+> 收斂到 `dark`（見 §6）。
 
 ---
 
@@ -139,13 +162,18 @@ def _build_topbar_html(
 - `html[data-theme="light"]` attribute 由 JS 注入時設定（見 §6）。
 - Cookie 僅保留結構；目前 JS 不讀 cookie 做判斷（固定 light）。
 
+> **啟用切換後（§6.2）**：`data-theme` 與 cookie 改由 client-side JS 依使用者點擊即時更新，
+> `st.session_state["theme"]` 不再反映 live 主題，僅作首屏 icon 的初始猜測（固定 `light`）。
+
 ---
 
-## 6. JS 注入（`inject_theme_js()`）
+## 6. JS 注入與切換邏輯
 
-`lib/theme.py` 的 `_THEME_JS`，於 `app.py` 每次 rerun 均呼叫。
+### 6.1 目前實作（停用態）
 
-目前實作：固定設 `data-theme="light"` 並掛上 FOUC guard，無 click handler。
+`lib/theme.py` 的 `_THEME_JS`，於 `app.py` 每次 rerun 經 `inject_theme_js()` 以
+`streamlit.components.v1.components.html(height=0)` 注入。目前固定設 `data-theme="light"`
+並掛上 FOUC guard，無 click handler：
 
 ```javascript
 (function () {
@@ -155,14 +183,209 @@ def _build_topbar_html(
 })();
 ```
 
-#### 未來（啟用切換功能時）需恢復的邏輯
+> 另有 `_FORCE_LIGHT_JS`（清 Streamlit `stActiveTheme*` localStorage、防重載迴圈），
+> **與切換功能正交**：其職責是鎖定 Streamlit **內建元件**恆為 light（§11），啟用切換後
+> 仍須保留（自訂 CSS 層才隨 `data-theme` 切換）。
 
-| 操作 | 說明 |
-|---|---|
-| `readCookie()` | 讀 `theme` cookie，未知值收斂到 `'light'` |
-| `applyTheme(t)` | 設 `data-theme`，寫 cookie（冪等） |
-| `syncButton(t)` | 換 SVG、更新 `aria-pressed` / `aria-label` |
-| click 監聽器 | `parent.__ssThemeReady` 旗標防止重複註冊 |
+---
+
+### 6.2 啟用切換功能：完整可實作規格
+
+> 本節將 §6.1 的「未來需恢復的邏輯」展開為可直接實作、可測試的規格。
+> 觸發條件：`ENABLE_THEME_TOGGLE=1`。停用態（=0）行為不變。
+
+#### 6.2.1 架構決策：純 client-side 切換，不繞回 Python
+
+主題只影響**自訂 CSS 層**（`html[data-theme]`），該屬性掛在 **parent document**，
+跨 rerun 不重載。Streamlit 無 client→Python 的 `session_state` 回寫通道（僅 `st.query_params`
+可間接觸發 rerun），且主題切換不需要伺服器參與。因此對齊 Frontend 的做法：
+
+| 方案 | 說明 | 採用 |
+|---|---|---|
+| **A. 純 client-side JS**（採用） | JS 讀 cookie → 設 `data-theme` → 寫 cookie → 換 icon / aria，全程不 rerun | ✅ |
+| B. `query_params` 往返 | JS 改 URL → Python 讀 `st.query_params` → 寫 `session_state` → rerun 重繪 | ❌ 每次切換整頁 rerun + 閃爍，且主題純 CSS 無需伺服器 |
+
+**推論**：`st.session_state["theme"]` 不再反映「使用者實際選的主題」——它只作為
+**首屏伺服器渲染的初始 icon 猜測**（固定 `light`）；真正的 live 主題由 JS 依 cookie 決定。
+此為刻意設計，需在 §5 標注。
+
+#### 6.2.2 決策點 D1：未知 / 缺省 cookie 的收斂值
+
+| 選項 | 值 | 後果 |
+|---|---|---|
+| **D1-a（建議）** | `light` | 沿用現有 `parse_theme`；與 config.toml 鎖定的 light 內建元件一致，不會出現「自訂層深色＋內建元件淺色」的半深狀態 |
+| D1-b | `dark`（對齊 Frontend `parseTheme`） | 首次造訪即深色自訂層，但 Streamlit 內建元件（§11）仍是 light → 視覺割裂 |
+
+> **建議採 D1-a（`light`）**。理由：Streamlit 內建元件受 config.toml `base="light"` 鎖定、
+> 無法隨 `data-theme` 變暗；若無 cookie 就進深色，整站會呈半深割裂。此為與 Frontend
+> **刻意的差異**（Frontend 全站可深色，故收斂 `dark`；Streamlit 內建層不能深色，故收斂 `light`）。
+> 實作前請 confirm 此決策；下方 JS / 測試以 D1-a 撰寫。
+
+#### 6.2.3 完整 JS（`_THEME_TOGGLE_JS`）
+
+`inject_theme_js()` 依 `enable_theme_toggle` 分支：`False` → 注入 §6.1 的 `_THEME_JS`；
+`True` → 注入下列腳本。SVG 常數與 `Secure` 片段由 Python 以 `json.dumps` / 條件字串填入
+（`%SUN%` / `%MOON%` / `%SECURE%` 為 Python 端 format 佔位）：
+
+```javascript
+(function () {
+  var pdoc = window.parent.document;
+  var SUN = %SUN%, MOON = %MOON%;        // Python 以 json.dumps(_SUN_SVG/_MOON_SVG) 填入
+  var SECURE = %SECURE%;                  // is_prod ? "; Secure" : ""
+
+  // readTheme：讀 theme cookie，未知 / 缺省收斂 'light'（決策 D1-a）
+  function readTheme() {
+    var m = pdoc.cookie.match(/(?:^|;\s*)theme=(light|dark)(?:;|$)/);
+    return m ? m[1] : 'light';
+  }
+  // applyTheme：設 data-theme + 寫 cookie（冪等）
+  function applyTheme(t) {
+    pdoc.documentElement.dataset.theme = t;
+    pdoc.cookie = 'theme=' + t + '; Max-Age=31536000; Path=/; SameSite=Lax' + SECURE;
+  }
+  // syncButton：換 SVG、更新 aria-pressed / aria-label（對齊 Frontend isLight）
+  function syncButton(btn, t) {
+    var isLight = t === 'light';
+    btn.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+    btn.setAttribute('aria-label', isLight ? '切換為深色' : '切換為淺色');
+    btn.innerHTML = isLight ? SUN : MOON;
+  }
+
+  var current = readTheme();
+  applyTheme(current);
+  pdoc.documentElement.setAttribute('data-theme-ready', '');
+
+  // 按鈕由 st.markdown 注入 parent DOM，且 components.html iframe 可能早於其掛載 →
+  // 短輪詢尋找按鈕（≤10 幀），找到即同步並綁定。
+  var tries = 0;
+  (function bind() {
+    var btn = pdoc.querySelector('.ss-topbar__theme-btn');
+    if (!btn) { if (tries++ < 10) requestAnimationFrame(bind); return; }
+    syncButton(btn, pdoc.documentElement.dataset.theme || current);
+    // 每次 rerun 皆為「新按鈕元素」→ 用 per-element dataset 旗標防重複綁定（見下方註）
+    if (!btn.dataset.ssThemeBound) {
+      btn.dataset.ssThemeBound = '1';
+      btn.addEventListener('click', function () {
+        var next = (pdoc.documentElement.dataset.theme === 'dark') ? 'light' : 'dark';
+        applyTheme(next);
+        syncButton(pdoc.querySelector('.ss-topbar__theme-btn'), next);
+      });
+    }
+  })();
+})();
+```
+
+> **關鍵修正**：§6.1 舊表寫「`parent.__ssThemeReady` 全域旗標防重複註冊」——在 Streamlit
+> rerun 模型下**錯誤**。每次 rerun `st.markdown` 產生**全新按鈕元素**，全域旗標會使新按鈕
+> 拿不到監聽器。正解是 **per-element 旗標**（`btn.dataset.ssThemeBound`）：新按鈕綁一次、
+> 同一按鈕不重綁。
+
+#### 6.2.4 `lib/topbar.py` 變更
+
+`_build_topbar_html` 在 `enable_theme_toggle=True` 時產生**可互動**按鈕（移除 `disabled`）：
+
+```html
+<!-- 初始伺服器渲染：以 light 為預設猜測；JS 於載入時依 cookie 校正 -->
+<button class="ss-topbar__theme-btn"
+        type="button"
+        aria-pressed="true"
+        aria-label="切換為深色">
+  <!-- _SUN_SVG（初始猜測；cookie=dark 時 JS 換成月亮） -->
+</button>
+```
+
+- 移除 `disabled`；`aria-pressed`／`aria-label` 給**初始值**（light），交由 JS `syncButton` 校正。
+- icon 初始為 `_SUN_SVG`（light 猜測）。`theme` 參數可續傳但僅為初始猜測，不再是事實來源。
+
+#### 6.2.5 `lib/config.py` / `app.py` / `.env`
+
+- `config.py`、`.env.example`：`enable_theme_toggle` 欄位已存在，無需變更。
+- `app.py`：`inject_theme_js()` 需能取得 `enable_theme_toggle` 與 `is_prod`，例如
+  `inject_theme_js(enable_theme_toggle=get_settings().enable_theme_toggle, is_prod=get_settings().app_env == "production")`。
+- `render_topbar(...)` 已傳 `enable_theme_toggle`（§9），無需變更。
+
+#### 6.2.6 CSS 變更（`styles/main.css`）
+
+以 `:disabled` 區分「停用佔位」與「可互動」兩態，避免 CSS 需感知 flag：
+
+```css
+/* 可互動預設（enable_theme_toggle=1，按鈕無 disabled） */
+.ss-topbar__theme-btn { cursor: pointer; opacity: 1; }
+.ss-topbar__theme-btn:hover:not(:disabled) {
+    color: #0f172a;                    /* ink-AAA */
+    background: rgba(15, 23, 42, 0.12); /* line */
+}
+/* 停用佔位（enable_theme_toggle=0 開發預覽時的 disabled 按鈕） */
+.ss-topbar__theme-btn:disabled { cursor: default; opacity: 0.6; }
+
+/* 深色主題 hover 覆寫 */
+html[data-theme="dark"] .ss-topbar__theme-btn:hover:not(:disabled) {
+    color: rgba(230, 237, 246, 0.95);   /* ink-AAA */
+    background: rgba(230, 237, 246, 0.08);
+}
+```
+
+#### 6.2.7 首屏 icon 閃爍（已知取捨）
+
+伺服器以 light 猜測渲染 icon；若 cookie=`dark`，JS 載入後把太陽換月亮，會有一次
+極短 icon 閃爍。**完全消除**需伺服器端讀 cookie（§11 明確排除）。`data-theme` 由 JS 儘早套用，
+色彩層閃爍已由 FOUC guard（§7.5）緩解；icon 閃爍列為**可接受的已知限制**。
+
+#### 6.2.8 對齊 Frontend 對照（啟用後）
+
+| 面向 | Frontend | Streamlit（啟用後） |
+|---|---|---|
+| 切換觸發 | `onClick={toggle}`（React） | `addEventListener('click')`（parent DOM 按鈕） |
+| 主題翻轉 | `theme==='dark' ? 'light' : 'dark'` | 同（讀 `data-theme` 翻轉） |
+| DOM 套用 | `documentElement.dataset.theme = next` | 同（透過 `window.parent.document`） |
+| cookie 寫入 | `buildThemeCookieString(next, isProd)` | JS 內聯，字串格式相同（Max-Age/Path/SameSite/Secure） |
+| aria 同步 | `aria-pressed={isLight}` / 動態 label | `syncButton` 設相同值 |
+| 重複綁定防護 | React 單一 handler | per-element `dataset.ssThemeBound` |
+| 未知值收斂 | `dark` | `light`（決策 D1-a；刻意差異） |
+| 內建元件 | 全站隨主題 | 恆 light（`base="light"` 鎖定，§11） |
+
+#### 6.2.9 測試規格（TDD，先寫失敗測試）
+
+**`tests/unit/test_topbar.py`**（啟用態按鈕，先 RED）
+```python
+def test_theme_btn_interactive_when_toggle_enabled(actor):
+    """enable_theme_toggle=True → 按鈕不含 disabled。"""
+    html = _build_topbar_html(actor, enable_theme_toggle=True)
+    assert "ss-topbar__theme-btn" in html
+    # 只檢查按鈕片段內無 disabled（避免誤中其他元素）
+    btn = html.split('ss-topbar__theme-btn', 1)[1].split("</button>", 1)[0]
+    assert "disabled" not in btn
+
+def test_theme_btn_has_aria_pressed(actor):
+    html = _build_topbar_html(actor, enable_theme_toggle=True)
+    assert 'aria-pressed="true"' in html   # 初始 light 猜測
+```
+
+**`tests/unit/test_theme.py`**（切換 JS 字串，仿現有 `_FORCE_LIGHT_JS` 測法）
+```python
+def test_toggle_js_reads_theme_cookie():        # 含讀 cookie 的 regex/字樣
+def test_toggle_js_registers_click_listener():  # 含 addEventListener('click'
+def test_toggle_js_guards_duplicate_binding():  # 含 ssThemeBound（per-element 旗標）
+def test_toggle_js_cookie_has_max_age():         # 含 Max-Age=31536000
+def test_toggle_js_no_secure_in_dev():           # is_prod=False → 不含 '; Secure'
+def test_toggle_js_has_secure_in_prod():         # is_prod=True  → 含 '; Secure'
+def test_toggle_js_default_converges_light():    # readTheme fallback 為 'light'（D1-a）
+def test_inject_theme_js_uses_force_js_when_disabled():  # 停用態仍走 _THEME_JS + _FORCE_LIGHT_JS
+```
+
+> JS 為字串常數，比照現有 `test_force_light_js_*` 以「子字串斷言」驗證關鍵操作存在；
+> 端到端點擊行為（DOM/cookie 真的變）建議另以 Playwright/瀏覽器煙霧測試涵蓋（非 pytest 範圍）。
+
+#### 6.2.10 驗收清單
+
+- [ ] D1 收斂值已 confirm（預設 D1-a=`light`）。
+- [ ] `ENABLE_THEME_TOGGLE=1` 時按鈕可點，點擊即時切換 `data-theme`、無整頁 rerun。
+- [ ] 重整後主題依 cookie 還原；未知/無 cookie → light。
+- [ ] `aria-pressed`／`aria-label`／icon 三者與當前主題一致。
+- [ ] 深色下 TopBar／Sidebar（§7.2–7.4）色彩正確；Streamlit 內建元件維持 light。
+- [ ] 連續 rerun（如切頁、表單）後按鈕仍可點且只綁一個 handler。
+- [ ] `ENABLE_THEME_TOGGLE=0` 行為與現況完全一致（回歸）。
+- [ ] 新增測試全綠，既有 `test_force_light_js_*` / `test_parse_theme_*` 不破。
 
 ---
 
