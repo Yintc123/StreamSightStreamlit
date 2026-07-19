@@ -457,6 +457,34 @@ html[data-theme-ready] * {
 }
 ```
 
+### 7.6 主內容區深色覆寫（2026-07-19 起）
+
+深色不再只蓋 TopBar / Sidebar——主內容區以 CSS 字面值對齊 Frontend `@theme` 深色 token
+（`styles/main.css`「主內容區（Main）」區塊）：
+
+| 對象 | 深色值（token） |
+|---|---|
+| `.stApp` 頁面底 / 文字 cascade | `#0b0f17`（surface-page）/ ink-AAA |
+| `stMain` h1–h6、Markdown p/li | ink-AAA `rgba(230,237,246,.95)` |
+| caption | ink-A `rgba(230,237,246,.45)` |
+| 連結 | `#38bdf8`（ink-link） |
+| hr / expander / table 邊框 | line `rgba(230,237,246,.12)` |
+| `stMetric` 卡片 | `#151c2b`（surface-card）＋ label ink-AA / value ink-AAA |
+| 次要按鈕 | surface-card 底＋line 框；hover brand `#22d3ee` |
+| 主要按鈕 | brand `#22d3ee` 底＋ink-on-brand `#06121a` 字；hover brand-400 `#38bdf8` |
+| 輸入框（BaseWeb input/textarea/select） | surface-card 底＋line 框＋ink-AAA 字；placeholder ink-A |
+| selectbox 下拉（popover listbox） | surface-card 底；option hover nav-hover |
+| 檔案上傳 dropzone | surface-card 底＋ink-AA 字 |
+| tabs active / highlight | brand `#22d3ee`；tab-border line |
+
+字體則由 `config.toml` `font = "PingFang TC, Noto Sans TC, system-ui, sans-serif"`
+對齊 Frontend `--font-sans`（兩主題共用，Streamlit ≥1.46 支援自訂 stack）。
+
+**已知限制**：canvas 渲染元件（`st.dataframe` glide-data-grid、vega 圖表）無法以 CSS
+覆寫，維持 light；語義 alert（success/error/warning/info）沿用 Streamlit 配色；
+`config.toml` `base="light"` 不變（§11），未列於上表的元件內部仍為 light。
+⚠ 本節大量使用 `data-testid` / `data-baseweb` 選擇器，Streamlit 升版需回歸。
+
 ---
 
 ## 8. Cookie 規格
@@ -551,7 +579,9 @@ def test_parse_theme_empty():   assert parse_theme("") == "light"
 
 ## 11. 不在本規格範圍
 
-- Streamlit 內建元件（按鈕、輸入框、圖表）的主題切換——需改 `config.toml`，目前不支援執行期切換。
+- Streamlit 內建元件的**底層主題**切換——`config.toml` 不支援執行期切換。
+  常用元件的基礎表面（按鈕、輸入框、metric、tabs、uploader 等）已由 §7.6 的 CSS
+  覆寫跟隨切換；canvas 類（dataframe、圖表）與語義 alert 仍不隨。
 - 瀏覽器端 `prefers-color-scheme` 媒體查詢偵測（自動跟隨系統主題）。**且已明確排除**：
   `config.toml` 以 `base = "light"` 鎖定白天模式，避免 Streamlit 底層元件在深色
   系統偏好下自動變暗（見 design-system.md §主題設定）。

@@ -60,7 +60,8 @@ primaryColor = "#2563eb"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f1f5f9"
 textColor = "#0f172a"
-font = "sans serif"
+# 對齊 Frontend globals.css --font-sans（Streamlit ≥1.46 支援自訂 stack；兩主題共用）
+font = "PingFang TC, Noto Sans TC, system-ui, sans-serif"
 ```
 
 > **`base = "light"` 為必要設定**：未設 `base` 時，Streamlit 底層元件（選單 /

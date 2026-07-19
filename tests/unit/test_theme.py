@@ -110,6 +110,22 @@ def test_config_toml_forces_light_base():
     assert 'base = "light"' in config
 
 
+def test_config_toml_uses_frontend_font_stack():
+    """[theme] font 需對齊 Frontend globals.css --font-sans。
+
+    Frontend: "PingFang TC", "Noto Sans TC", system-ui, sans-serif。
+    Streamlit ≥1.46 的 theme.font 支援逗號分隔自訂字體 stack，
+    能用 config.toml 解決就不寫 CSS（design-system 原則）。
+    """
+    from pathlib import Path
+
+    config = (Path(__file__).resolve().parents[2] / ".streamlit" / "config.toml").read_text(
+        encoding="utf-8"
+    )
+    assert "PingFang TC" in config
+    assert "Noto Sans TC" in config
+
+
 # ── 強制白天模式（清除瀏覽器記住的 Appearance 覆寫）──────────────────────────
 #
 # config.toml 的 base="light" 只是「乾淨瀏覽器」的預設；Streamlit 允許使用者

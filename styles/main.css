@@ -510,6 +510,156 @@ html[data-theme="dark"] [data-testid="stSidebarResizeHandle"]:hover::after {
     background-color: #22d3ee;                        /* brand（cyan） */
 }
 
+/* ── 主內容區（Main）──────────────────────────────────────────────────────────
+ * 對齊 Frontend globals.css @theme 深色 token：
+ *   surface-page #0b0f17 / surface-card #151c2b
+ *   ink-AAA rgba(230,237,246,.95) / ink-AA .72 / ink-A .45
+ *   line rgba(230,237,246,.12) / link #38bdf8 / brand #22d3ee / ink-on-brand #06121a
+ * 已知限制（theme-toggle.md §7.6）：canvas 元件（st.dataframe、圖表）與
+ * 語義 alert（success/error）不隨切換；config.toml base="light" 維持不變。 */
+
+/* 頁面底 + 文字 cascade 起點：.stApp 是 Streamlit 設 bg/textColor 的根 */
+html[data-theme="dark"] .stApp {
+    background-color: #0b0f17;                        /* surface-page */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* 標題：Streamlit 對 h1–h6 設有明確色（theme.textColor），需覆寫 */
+html[data-theme="dark"] [data-testid="stMain"] h1,
+html[data-theme="dark"] [data-testid="stMain"] h2,
+html[data-theme="dark"] [data-testid="stMain"] h3,
+html[data-theme="dark"] [data-testid="stMain"] h4,
+html[data-theme="dark"] [data-testid="stMain"] h5,
+html[data-theme="dark"] [data-testid="stMain"] h6 {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* Markdown 內文安全網（多數繼承 .stApp，個別元素 Streamlit 仍設明確色） */
+html[data-theme="dark"] [data-testid="stMain"] .stMarkdown p,
+html[data-theme="dark"] [data-testid="stMain"] .stMarkdown li {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* caption / 輔助文字：ink-A（對齊 Frontend muted） */
+html[data-theme="dark"] [data-testid="stCaptionContainer"],
+html[data-theme="dark"] [data-testid="stCaptionContainer"] p {
+    color: rgba(230, 237, 246, 0.45);                 /* ink-A */
+}
+
+/* 連結（主內容區；TopBar / Sidebar 另有覆寫） */
+html[data-theme="dark"] [data-testid="stMain"] a {
+    color: #38bdf8;                                   /* ink-link */
+}
+
+/* 分隔線 */
+html[data-theme="dark"] [data-testid="stMain"] hr {
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+/* 指標卡：light 用 #f1f5f9，dark 用 surface-card */
+html[data-theme="dark"] [data-testid="stMetric"] {
+    background: #151c2b;                              /* surface-card */
+}
+
+html[data-theme="dark"] [data-testid="stMetricLabel"],
+html[data-theme="dark"] [data-testid="stMetricLabel"] p {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+html[data-theme="dark"] [data-testid="stMetricValue"] {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+/* 次要按鈕：surface-card 底 + line 邊框；hover 走 brand（cyan） */
+html[data-theme="dark"] .stButton button[kind="secondary"] {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+html[data-theme="dark"] .stButton button[kind="secondary"]:hover {
+    border-color: #22d3ee;                            /* brand */
+    color: #22d3ee;
+}
+
+/* 主要按鈕：brand（cyan）底 + 深色字（對齊 Frontend ink-on-brand） */
+html[data-theme="dark"] .stButton button[kind="primary"] {
+    background-color: #22d3ee;                        /* brand */
+    border-color: #22d3ee;
+    color: #06121a;                                   /* ink-on-brand */
+}
+
+html[data-theme="dark"] .stButton button[kind="primary"]:hover {
+    background-color: #38bdf8;                        /* brand-400（hover） */
+    border-color: #38bdf8;
+    color: #06121a;
+}
+
+/* 輸入框（text / number / textarea / select 的 BaseWeb 容器） */
+html[data-theme="dark"] [data-baseweb="input"],
+html[data-theme="dark"] [data-baseweb="textarea"],
+html[data-theme="dark"] [data-baseweb="select"] > div {
+    background-color: #151c2b;                        /* surface-card */
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+html[data-theme="dark"] [data-baseweb="input"] input,
+html[data-theme="dark"] [data-baseweb="textarea"] textarea,
+html[data-theme="dark"] [data-baseweb="select"] input {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+    caret-color: rgba(230, 237, 246, 0.95);
+}
+
+html[data-theme="dark"] [data-baseweb="input"] input::placeholder,
+html[data-theme="dark"] [data-baseweb="textarea"] textarea::placeholder {
+    color: rgba(230, 237, 246, 0.45);                 /* ink-A */
+}
+
+/* selectbox 下拉選單（body portal 內的 listbox） */
+html[data-theme="dark"] [data-baseweb="popover"] [role="listbox"] {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+html[data-theme="dark"] [data-baseweb="popover"] [role="option"]:hover {
+    background-color: rgba(230, 237, 246, 0.08);      /* nav-hover */
+}
+
+/* 檔案上傳 dropzone */
+html[data-theme="dark"] [data-testid="stFileUploaderDropzone"] {
+    background-color: #151c2b;                        /* surface-card */
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
+/* tabs：active 色由 primaryColor（light 藍）改 brand（cyan） */
+html[data-theme="dark"] [data-testid="stTabs"] button[aria-selected="true"] {
+    color: #22d3ee;                                   /* brand */
+}
+
+html[data-theme="dark"] [data-baseweb="tab-highlight"] {
+    background-color: #22d3ee;                        /* brand */
+}
+
+html[data-theme="dark"] [data-baseweb="tab-border"] {
+    background-color: rgba(230, 237, 246, 0.12);      /* line */
+}
+
+/* expander 邊框 */
+html[data-theme="dark"] [data-testid="stExpander"] details {
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
+/* st.table 靜態表格 */
+html[data-theme="dark"] [data-testid="stTable"] table {
+    color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
+}
+
+html[data-theme="dark"] [data-testid="stTable"] th,
+html[data-theme="dark"] [data-testid="stTable"] td {
+    border-color: rgba(230, 237, 246, 0.12);          /* line */
+}
+
 /* ── FOUC Guard + 平滑過渡 ───────────────────────────────────────────────── */
 /* 對齊 Frontend globals.css 014b §3.4：transition 僅在 JS 掛上
  * [data-theme-ready] 後啟用，避免首屏初始色觸發過渡動畫。 */
