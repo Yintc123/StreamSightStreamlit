@@ -15,15 +15,29 @@
 
 ### 顏色
 
+#### 主題色（`config.toml` 直接設定）
+
 | Token | 值 | 用途 |
 |---|---|---|
 | primary | `#2563eb` | 主色:主要按鈕、連結、重點 |
-| background | `#ffffff` | 頁面底色 |
-| secondaryBackground | `#f1f5f9` | 卡片 / 側邊欄 / 區塊底色 |
-| text | `#0f172a` | 主要文字 |
+| background | `#ffffff` | 頁面底色（`surface-page`） |
+| secondaryBackground | `#f1f5f9` | 卡片 / 側邊欄底色（`surface-card`） |
+| text | `#0f172a` | 主要文字（`ink-AAA`） |
 | success | `#16a34a` | 正常狀態 / 成功 |
 | warning | `#f59e0b` | 一般告警 |
 | danger | `#dc2626` | 嚴重告警 / 刪除 |
+
+#### Sidebar Nav Token（`main.css` 中以字面值寫入）
+
+與 StreamSightFrontend `globals.css` `[data-theme="light"]` 的 CSS 變數**完全對齊**；值取自 Streamlit 側欄實測（stSidebar computed style，2026-07-19）。
+
+| Token 語意 | 對應 Frontend 變數 | 值 | 用途 |
+|---|---|---|---|
+| `ink-AAA` | `--color-ink-AAA` | `#0f172a` | active 項目文字 |
+| `ink-AA` | `--color-ink-AA` | `rgba(15, 23, 42, 0.66)` | 非 active 項目文字 |
+| `nav-hover` | `--color-nav-hover` | `rgba(141, 173, 206, 0.15)` | 項目 hover / 按鈕 hover 填色 |
+| `nav-active` | `--color-nav-active` | `rgba(141, 173, 206, 0.25)` | 項目 active 填色 |
+| `brand` | `--color-brand` | `#2563eb` | 調寬把手 hover 細線色 |
 
 ### 間距
 
@@ -74,11 +88,20 @@ load_css()
 
 ## 允許的自訂樣式(`styles/main.css`)
 
-限縮在版面與品牌層級,不逐一 hack 內部元件:
+限縮在版面與品牌層級,不逐一 hack 內部元件。
+
+### 版面 / 品牌層級
 
 ```css
 /* 內容區:縮上邊距、限制寬度 */
-.block-container { padding-top: 2rem; max-width: 1100px; }
+.block-container { padding-top: 0.5rem; max-width: 1100px; }
+
+/* 元素容器上下 padding 減半（Streamlit 預設 0.5rem → 0.25rem，壓縮垂直空間） */
+.stElementContainer { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+
+/* 分隔線（st.divider / <hr>）移除多餘 padding 與 margin */
+.stElementContainer:has(hr) { padding-top: 0; padding-bottom: 0; }
+.stElementContainer:has(hr) hr { margin: 0; }
 
 /* 主要按鈕圓角 */
 .stButton > button { border-radius: 8px; }
@@ -90,6 +113,77 @@ load_css()
     border-radius: 12px;
 }
 ```
+
+### 側邊欄 Nav（對齊 StreamSightFrontend CmsSideNav）
+
+> **視覺規格來源**：StreamSightFrontend `src/app/cms/CmsSideNav.tsx`（Spec 016 §4.2–4.3）。  
+> Frontend 的 light-mode 顏色值是從 Streamlit stSidebar computed style 實測（2026-07-19）後寫進 `globals.css`，此處反向對齊以達到兩端 Nav 一致。
+
+```css
+/* 移除側欄右側邊框（靠 #f1f5f9 vs #ffffff 色差分隔） */
+section[data-testid="stSidebar"] { border-right: none; }
+
+/* Nav 連結基底：h-7(28px) rounded-lg(8px) px-2 text-base font-normal */
+[data-testid="stSidebarNavLink"] {
+    border-radius: 8px;
+    padding: 0 0.5rem;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    color: rgba(15, 23, 42, 0.66);   /* ink-AA */
+    font-weight: 400;
+    text-decoration: none;
+    transition: background-color 150ms ease;
+}
+
+/* hover：bg-nav-hover = rgba(141,173,206,0.15) */
+[data-testid="stSidebarNavLink"]:hover {
+    background-color: rgba(141, 173, 206, 0.15);
+    color: rgba(15, 23, 42, 0.66);
+    text-decoration: none;
+}
+
+/* active：bg-nav-active = rgba(141,173,206,0.25)、ink-AAA、font-semibold */
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+    background-color: rgba(141, 173, 206, 0.25);
+    color: #0f172a;   /* ink-AAA */
+    font-weight: 600;
+}
+
+/* 收合 / 展開按鈕：28×28px rounded-lg hover:bg-nav-hover */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarExpandButton"] button {
+    width: 28px; height: 28px; border-radius: 8px;
+    transition: background-color 150ms ease;
+}
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stSidebarExpandButton"] button:hover {
+    background-color: rgba(141, 173, 206, 0.15);
+}
+
+/* 調寬把手：8px 透明，hover 顯示 brand(#2563eb) 1px 細線 */
+[data-testid="stSidebarResizeHandle"] { width: 8px; background: transparent; cursor: col-resize; }
+[data-testid="stSidebarResizeHandle"]::after {
+    content: ''; display: block; width: 1px; height: 100%;
+    margin: 0 auto; background: transparent;
+    transition: background-color 150ms ease;
+}
+[data-testid="stSidebarResizeHandle"]:hover::after { background-color: #2563eb; }
+```
+
+**選擇器對應表**
+
+| 元素 | Streamlit selector | CmsSideNav 對應 |
+|---|---|---|
+| 側欄面板 | `section[data-testid="stSidebar"]` | 外層 `div.bg-surface-card` |
+| Nav 連結 | `[data-testid="stSidebarNavLink"]` | `<Link className={itemClass(...)}>`|
+| 收合按鈕 | `[data-testid="stSidebarCollapseButton"] button` | `button aria-label="收合側欄"` |
+| 展開按鈕 | `[data-testid="stSidebarExpandButton"] button` | `button aria-label="展開側欄"` |
+| 調寬把手 | `[data-testid="stSidebarResizeHandle"]` | `div role="separator"` |
+
+> **`aria-current="page"` の管理**：`[aria-current="page"]` attribute 由 `st.navigation` 在執行時自動加到當前頁連結上，頁面程式碼無需手動處理。
+
+> ⚠️ `stSidebarCollapseButton`、`stSidebarExpandButton`、`stSidebarResizeHandle` 等 `data-testid` 屬於 Streamlit 內部，升版後需回歸驗證（見「風險與注意」）。
 
 ## 狙擊特定元素
 

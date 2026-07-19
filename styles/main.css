@@ -1,6 +1,96 @@
 /* StreamSight 共用自訂 CSS(見 docs/specs/design-system.md)
    原則:能用 config.toml 主題解決就不寫 CSS,此處僅版面 / 品牌層級最小微調。 */
 
+/* ============================================================
+ * 側邊欄 Nav — 對齊 StreamSightFrontend CmsSideNav (Spec 016 §4.2–4.3)
+ *
+ * 顏色值取自 Frontend globals.css [data-theme="light"]（Streamlit 側欄
+ * 實測值，2026-07-19）；選擇器使用 data-testid，升版需回歸驗證（設計系統 §風險）。
+ *
+ * 對齊目標（CmsSideNav Tailwind class → CSS 轉換）：
+ *   panel       bg-surface-card  → secondaryBackgroundColor #f1f5f9（config.toml）
+ *   nav item    rounded-lg px-2 h-7 text-base
+ *   inactive    text-ink-AA      → rgba(15,23,42,0.66)   font-weight:400
+ *   hover       bg-nav-hover     → rgba(141,173,206,0.15)
+ *   active      bg-nav-active    → rgba(141,173,206,0.25) text-ink-AAA #0f172a font-weight:600
+ *   button      h-7 w-7 rounded-lg hover:bg-nav-hover
+ *   no border   以 #f1f5f9 vs #ffffff 色差分隔，移除預設 border-right
+ *   resize      右緣 8px 透明，hover 顯示 brand(#2563eb) 1px 細線
+ * ============================================================ */
+
+/* 移除側欄右側邊框（CmsSideNav 無 border，靠 surface 色差分隔） */
+section[data-testid="stSidebar"] {
+    border-right: none;
+}
+
+/* Nav 連結基底：h-7(28px) rounded-lg(8px) px-2(0.5rem) text-base font-normal */
+[data-testid="stSidebarNavLink"] {
+    border-radius: 8px;
+    padding: 0 0.5rem;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    color: rgba(15, 23, 42, 0.66);   /* ink-AA */
+    font-weight: 400;
+    text-decoration: none;
+    transition: background-color 150ms ease;
+}
+
+/* hover：bg-nav-hover = rgba(141,173,206,0.15)（Frontend 實測 Streamlit 精確值） */
+[data-testid="stSidebarNavLink"]:hover {
+    background-color: rgba(141, 173, 206, 0.15);
+    color: rgba(15, 23, 42, 0.66);
+    text-decoration: none;
+}
+
+/* active：bg-nav-active = rgba(141,173,206,0.25)、ink-AAA、font-semibold(600) */
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+    background-color: rgba(141, 173, 206, 0.25);
+    color: #0f172a;                   /* ink-AAA */
+    font-weight: 600;
+}
+
+/* 收合 / 展開按鈕：h-7(28px) w-7(28px) rounded-lg hover:bg-nav-hover
+   ⚠ data-testid 版本異動風險：Streamlit 升版後需回歸確認 */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarExpandButton"] button {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    transition: background-color 150ms ease;
+}
+
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stSidebarExpandButton"] button:hover {
+    background-color: rgba(141, 173, 206, 0.15);
+}
+
+/* 調寬把手：透明底，hover 顯示 brand(#2563eb) 1px 細線（對齊 CmsSideNav 右緣拖曳條）
+   ⚠ data-testid 版本異動風險 */
+[data-testid="stSidebarResizeHandle"] {
+    width: 8px;
+    cursor: col-resize;
+    background: transparent;
+}
+
+[data-testid="stSidebarResizeHandle"]::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 100%;
+    margin: 0 auto;
+    background: transparent;
+    transition: background-color 150ms ease;
+}
+
+[data-testid="stSidebarResizeHandle"]:hover::after {
+    background-color: #2563eb;   /* brand（light） */
+}
+
+/* ============================================================
+ * 版面 / 品牌層級最小微調
+ * ============================================================ */
+
 /* 內容區:縮上邊距、限制寬度 */
 .block-container {
     padding-top: 0.5rem;
