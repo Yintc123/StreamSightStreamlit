@@ -1,5 +1,7 @@
 # 主題設定(見 docs/specs/design-system.md 設計 Token)
 [theme]
+# 鎖定白天模式：未設 base 時 Streamlit 會跟隨瀏覽器 prefers-color-scheme 變暗
+base = "light"
 primaryColor = "#2563eb"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f1f5f9"

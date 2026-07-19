@@ -55,12 +55,19 @@
 
 ```toml
 [theme]
+base = "light"
 primaryColor = "#2563eb"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f1f5f9"
 textColor = "#0f172a"
 font = "sans serif"
 ```
+
+> **`base = "light"` 為必要設定**：未設 `base` 時，Streamlit 底層元件（選單 /
+> dialog / dataframe / sidebar 等）會跟隨瀏覽器 `prefers-color-scheme`——深色
+> 系統偏好的使用者會看到整站變暗。本應用**只支援白天模式**，以 `base = "light"`
+> 明確鎖定（有 `tests/unit/test_theme.py::test_config_toml_forces_light_base`
+> 迴歸護欄）。
 
 ## CSS 載入方式
 

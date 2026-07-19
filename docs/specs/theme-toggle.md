@@ -329,7 +329,9 @@ def test_parse_theme_empty():   assert parse_theme("") == "light"
 ## 11. 不在本規格範圍
 
 - Streamlit 內建元件（按鈕、輸入框、圖表）的主題切換——需改 `config.toml`，目前不支援執行期切換。
-- 瀏覽器端 `prefers-color-scheme` 媒體查詢偵測（自動跟隨系統主題）。
+- 瀏覽器端 `prefers-color-scheme` 媒體查詢偵測（自動跟隨系統主題）。**且已明確排除**：
+  `config.toml` 以 `base = "light"` 鎖定白天模式，避免 Streamlit 底層元件在深色
+  系統偏好下自動變暗（見 design-system.md §主題設定）。
 - 伺服器端 Python 讀取 cookie。
 - ThemeToggle 以外的 TopBar 互動（登出按鈕 BFF 流程）。
 

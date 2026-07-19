@@ -87,3 +87,19 @@ def test_cookie_string_no_secure_in_dev():
 def test_cookie_string_has_secure_in_prod():
     """is_prod=True 時含 Secure 屬性（對齊 Frontend isProd 條件）。"""
     assert "Secure" in build_theme_cookie_string("dark", is_prod=True)
+
+
+# ── 強制白天模式（config.toml base）──────────────────────────────────────────
+
+def test_config_toml_forces_light_base():
+    """[theme] 需明確 base = "light"。
+
+    未設定 base 時，Streamlit 底層元件（選單 / dialog / dataframe 等）會跟隨
+    瀏覽器 prefers-color-scheme，深色系統偏好下整站變暗——本應用只支援白天模式。
+    """
+    from pathlib import Path
+
+    config = (Path(__file__).resolve().parents[2] / ".streamlit" / "config.toml").read_text(
+        encoding="utf-8"
+    )
+    assert 'base = "light"' in config
