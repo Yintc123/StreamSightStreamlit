@@ -5,7 +5,10 @@
 """
 from __future__ import annotations
 
-from typing import List, Optional
+from datetime import date, datetime, timezone
+from typing import List, Optional, Tuple
+
+from lib.models import LogEntry
 
 
 def color_log_level(level: str) -> str:
@@ -27,6 +30,39 @@ def format_percent(value: Optional[float]) -> str:
     if value is None:
         return "N/A"
     return f"{value:.1f}%"
+
+
+def format_log_ts(ts_ms: int) -> str:
+    """epoch ms（UTC）→ 'YYYY-MM-DD HH:MM:SS' UTC 字串。"""
+    return datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+
+def date_to_epoch_ms(d: date) -> int:
+    """date → UTC 當日 00:00:00 epoch ms。"""
+    return int(datetime(d.year, d.month, d.day, tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def date_range_to_ms(d_from: date, d_to: date) -> Tuple[int, int]:
+    """(起, 迄) date → (since_ms, until_ms)；until 為 d_to 當日 23:59:59.999。"""
+    since_ms = date_to_epoch_ms(d_from)
+    until_ms = date_to_epoch_ms(d_to) + 86_400_000 - 1
+    return since_ms, until_ms
+
+
+def log_entries_to_rows(entries: List) -> List[dict]:
+    """LogEntry list → display rows（供 st.dataframe）；request_id None 顯示 '—'。"""
+    return [
+        {
+            "時間":       format_log_ts(e.ts),
+            "等級":       e.level,
+            "模組":       e.logger,
+            "訊息":       e.message,
+            "Request ID": e.request_id if e.request_id is not None else "—",
+        }
+        for e in entries
+    ]
 
 
 def parse_infra_snapshot(snapshots: List[dict]) -> dict:
@@ -51,14 +87,14 @@ def fetch_infra_snapshot(client, base_url: str) -> dict:
     return parse_infra_snapshot(data.get("snapshots", []))
 
 
-def seed_logs() -> List[dict]:
-    """mock 靜態日誌（含 INFO / WARNING / ERROR；決定性）。"""
+def seed_logs() -> List[LogEntry]:
+    """mock 靜態日誌，格式對齊後端 LogEntry schema（含 INFO / WARNING / ERROR；決定性）。"""
     return [
-        {"time": "2024-01-01 08:00", "user": "alice",  "action": "login",          "result": "success",          "level": "INFO"},
-        {"time": "2024-01-01 09:00", "user": "bob",    "action": "update_record",  "result": "success",          "level": "INFO"},
-        {"time": "2024-01-01 10:00", "user": "carol",  "action": "delete_record",  "result": "permission_denied","level": "WARNING"},
-        {"time": "2024-01-01 11:00", "user": "alice",  "action": "import_records", "result": "partial_fail",     "level": "WARNING"},
-        {"time": "2024-01-01 12:00", "user": "system", "action": "db_backup",      "result": "failed",           "level": "ERROR"},
+        LogEntry(ts=1704067200000, level="INFO",    logger="app.api.routers.auth",    message="login success",                request_id="req-001"),
+        LogEntry(ts=1704070800000, level="INFO",    logger="app.services.record",     message="record created id=42",         request_id="req-002"),
+        LogEntry(ts=1704074400000, level="WARNING", logger="app.core.auth.jwt",       message="token near expiry",            request_id="req-003"),
+        LogEntry(ts=1704078000000, level="WARNING", logger="app.services.monitoring", message="log flush failed, retry",      request_id=None),
+        LogEntry(ts=1704081600000, level="ERROR",   logger="app.core.db.session",     message="db connection pool exhausted", request_id="req-005", module="session", func="get_session", line=42),
     ]
 
 

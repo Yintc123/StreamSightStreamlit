@@ -24,8 +24,9 @@
 [ 日誌 ] [ DB 狀態 ]                                         ← st.tabs
 
 ── 日誌 ────────────────────────────────────────────────
- 時間範圍  使用者[▾]  等級[▾]  ← filter_bar(key_prefix="admin_log")
- 時間  使用者  動作  結果 (等級著色)   ← st.dataframe + pagination_controls
+ 等級[▾]  時間範圍              ← filter_bar(key_prefix="admin_log")
+ 時間  等級  模組  訊息  Request ID   ← st.dataframe(log_entries_to_rows(...))
+                       [ ← 上一頁 ]  [ 下一頁 → ]   ← cursor-based 分頁
 
 ── DB 狀態 ──────────────────────────────────────────────
  ┌──────────────┬──────────────┬──────────────┐
@@ -37,7 +38,7 @@
 
 | 分頁 | 主要元件 | 備註 |
 |---|---|---|
-| 日誌 | `filter_bar(key_prefix="admin_log")` + `st.dataframe` + `pagination_controls` | 等級以狀態色著色 |
+| 日誌 | `filter_bar(key_prefix="admin_log")` + `st.dataframe` + cursor 分頁按鈕 | 欄位：時間(UTC)/等級/模組/訊息/Request ID |
 | DB 狀態 | `@st.fragment(run_every=1.0)` 包裹 `metric_cards()` | 唯讀；三個伺服器狀態指標；None 顯示 "N/A"；每 1 秒輪詢 |
 
 ---
@@ -46,21 +47,33 @@
 
 ### 日誌分頁
 
-以 `filter_bar` + `pagination_controls` 管理:
+接後端 `GET /monitoring/logs`（cursor-based 分頁）；詳細契約與決策見
+[server-log.md](../server-log.md)（日誌部分的單一真相）。
 
 ```python
-from lib.ui import filter_bar, pagination_controls, empty_state
-
-fp = filter_bar(
+fp_log = filter_bar(
     categories=["全部", "INFO", "WARNING", "ERROR"],
     key_prefix="admin_log",
     show_keyword=False,
 )
-page = pagination_controls(total=log_total, size=50, key_prefix="admin_log")
+
+# 篩選改變 → 重設游標與棧（避免舊 cursor 與新篩選混用）
+filter_sig = (fp_log.category, fp_log.date_from, fp_log.date_to)
+if st.session_state.get("admin_log_filter_sig") != filter_sig:
+    st.session_state["admin_log_filter_sig"] = filter_sig
+    st.session_state["admin_log_cursor"] = None
+    st.session_state["admin_log_cursor_stack"] = []
+
+# mock：seed_logs() 以 level / ts 範圍在前端過濾，next_cursor=None
+# api：ApiDataSource(_get_api_client(), base).get_logs(level=..., since_ms=...,
+#      until_ms=..., cursor=..., limit=100)；失敗 render_error → empty_state("無法載入日誌")
+
+st.dataframe(log_entries_to_rows(log_page.items), hide_index=True)
+# [← 上一頁]（棧空禁用）  [下一頁 →]（next_cursor=None 禁用）
 ```
 
-- `st.dataframe` 含等級著色（以 `column_config` 或 CSS 處理等級色）。
-- API endpoint（placeholder）：`GET /monitoring/logs`。
+- 日期範圍以 `date_range_to_ms()` 轉 `since_ms / until_ms`（epoch ms，UTC）。
+- 時間以 UTC 顯示（`format_log_ts`），UI 加「時間為 UTC」標注。
 
 ### DB 狀態分頁
 
@@ -152,10 +165,14 @@ Authorization: Bearer {access_token}
 
 | 函式 | 簽章 | 契約 |
 |---|---|---|
-| `color_log_level` | `(level: str) -> str` | `"ERROR"` / `"WARNING"` / `"INFO"` → 對應色彩 token；未知等級回中性色。 |
+| `color_log_level` | `(level: str) -> str` | `"ERROR"` / `"WARNING"` / `"INFO"` → 對應色彩 token；未知等級回中性色。（保留備用） |
 | `format_db_size` | `(size_bytes: int) -> str` | 位元組 → `"{:.1f} MB"` 字串；`0 → "0.0 MB"`。（保留備用） |
 | `format_percent` | `(value: float \| None) -> str` | `45.2 → "45.2%"`；`None → "N/A"`。 |
-| `seed_logs` | `() -> list[dict]` | mock 靜態日誌；決定性、不依賴時鐘。 |
+| `format_log_ts` | `(ts_ms: int) -> str` | epoch ms → `"YYYY-MM-DD HH:MM:SS"` UTC 字串。 |
+| `date_to_epoch_ms` | `(d: date) -> int` | date → UTC 當日 00:00 epoch ms。 |
+| `date_range_to_ms` | `(d_from, d_to) -> tuple[int, int]` | → `(since_ms, until_ms)`；until = d_to 當日 23:59:59.999。 |
+| `log_entries_to_rows` | `(entries: list) -> list[dict]` | `LogEntry` list → `{"時間","等級","模組","訊息","Request ID"}` rows；`request_id=None → "—"`。 |
+| `seed_logs` | `() -> list[LogEntry]` | mock 靜態日誌（對齊後端 LogEntry schema）；決定性、不依賴時鐘。 |
 | `seed_db_status` | `() -> dict` | 回傳 `{"cpu_percent": 45.2, "memory_percent": 62.8, "connections": 5}`；決定性。 |
 | `parse_infra_snapshot` | `(snapshots: list[dict]) -> dict` | 從後端 `InfraHistoryResponse.snapshots` 取最新一筆，回傳 `{"cpu_percent": float \| None, "memory_percent": float \| None, "db_connections": int \| None}`；空 list 時全部為 `None`。 |
 | `fetch_infra_snapshot` | `(client: ApiClient, base_url: str) -> dict` | 呼叫 `GET {base_url}/monitoring/infra`，回傳 `parse_infra_snapshot(data["snapshots"])`；API 失敗向上拋例外。 |
@@ -223,7 +240,9 @@ def fetch_infra_snapshot(client: "ApiClient", base_url: str) -> dict:
 | `admin_log_category` | `admin_log_` | `filter_bar()` | 日誌分頁等級篩選 |
 | `admin_log_date_from` | `admin_log_` | `filter_bar()` | 日誌分頁起始日期 |
 | `admin_log_date_to` | `admin_log_` | `filter_bar()` | 日誌分頁結束日期 |
-| `admin_log_page` | `admin_log_` | `pagination_controls()` | 日誌分頁當前頁碼 |
+| `admin_log_cursor` | `admin_log_` | 頁面 | 當前頁游標（`None` = 第一頁） |
+| `admin_log_cursor_stack` | `admin_log_` | 頁面 | 上一頁游標棧（list） |
+| `admin_log_filter_sig` | `admin_log_` | 頁面 | 篩選簽章；改變時重設 cursor 與棧 |
 | `last_request_id` | — | `render_error` | 管理 API 失敗時附錯誤代碼 |
 
 ---
@@ -238,7 +257,8 @@ def fetch_infra_snapshot(client: "ApiClient", base_url: str) -> dict:
 | `GET /monitoring/infra` 失敗（逾時 / 連線錯誤 / 5xx） | `render_error(exc)` → `st.error`（附 request_id）→ **early `return`**（fragment 續跑，1 秒後自動重試；不可 `st.stop()`） |
 | `snapshots` 為空（後端尚無採樣） | `parse_infra_snapshot([])` 回傳全 `None` → 三個指標均顯示 "N/A"（不報錯） |
 | `cpu_percent` / `db_connections` 為 `None` | `format_percent(None)` → `"N/A"`；不報錯，靜默顯示 |
-| 無日誌資料（篩選後） | `empty_state()` 取代對應列表 |
+| `GET /monitoring/logs` 失敗 | `render_error(exc)` + `empty_state("無法載入日誌")` |
+| 無日誌資料（篩選後） | `empty_state("無符合條件的日誌")` 取代列表 |
 
 ---
 
@@ -246,8 +266,10 @@ def fetch_infra_snapshot(client: "ApiClient", base_url: str) -> dict:
 
 | 模組 | 用途 |
 |---|---|
-| `lib/ui.py` | `filter_bar`、`metric_cards`、`pagination_controls`、`empty_state` |
-| `lib/system_management.py` | `color_log_level`、`format_percent`、`seed_logs`、`seed_db_status`、`parse_infra_snapshot`、`fetch_infra_snapshot` |
+| `lib/ui.py` | `filter_bar`、`metric_cards`、`empty_state` |
+| `lib/system_management.py` | `format_percent`、`format_log_ts`、`date_range_to_ms`、`log_entries_to_rows`、`seed_logs`、`seed_db_status`、`parse_infra_snapshot`、`fetch_infra_snapshot` |
+| `lib/models.py`（日誌） | `LogEntry`、`LogsPage` 資料契約 |
+| `lib/api_client.py` | `ApiDataSource.get_logs()`（cursor 分頁；api 模式才用） |
 | `lib/data_source.py` | `_get_api_client()`（共用 ApiClient；api 模式才引入） |
 | `lib/config.py` | `get_settings()`（`use_mock` / `fastapi_base_url`） |
 | `lib/errors.py` | `render_error`（api 模式失敗時呈現） |

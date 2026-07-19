@@ -11,6 +11,17 @@ PAGE_PATH = "pages/system_management.py"
 PAGE_PATH_DIRECT = str(Path(__file__).resolve().parents[2] / "pages" / "system_management.py")
 
 
+def _stub_get_logs(monkeypatch, log_page=None):
+    """api 模式下日誌分頁也會打 API；AppTest 無 token，以 stub 取代 get_logs。"""
+    from lib.models import LogsPage
+
+    result = log_page if log_page is not None else LogsPage(items=[], next_cursor=None)
+    monkeypatch.setattr(
+        "lib.api_client.ApiDataSource.get_logs",
+        lambda self, **kwargs: result,
+    )
+
+
 def _open_system_management_api(actor: Actor, monkeypatch, mock_infra: dict) -> AppTest:
     """use_mock=False helper：直接測頁面（不穿越 app.py）、stub fetch_infra_snapshot。"""
     monkeypatch.setenv("USE_MOCK", "false")
@@ -18,6 +29,7 @@ def _open_system_management_api(actor: Actor, monkeypatch, mock_infra: dict) -> 
         "lib.system_management.fetch_infra_snapshot",
         lambda *_: mock_infra,
     )
+    _stub_get_logs(monkeypatch)
     at = AppTest.from_file(PAGE_PATH_DIRECT)
     at.session_state["actor"] = actor
     at.run()
@@ -124,11 +136,67 @@ def test_db_tab_api_error_shows_error(monkeypatch):
 
     monkeypatch.setenv("USE_MOCK", "false")
     monkeypatch.setattr("lib.system_management.fetch_infra_snapshot", _raise)
+    _stub_get_logs(monkeypatch)
     at = AppTest.from_file(PAGE_PATH_DIRECT)
     at.session_state["actor"] = Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN)
     at.run()
     assert not at.exception
     assert len(at.error) >= 1
+
+
+# --- 13. 日誌分頁以 dataframe 呈現 LogEntry 欄位 ---
+
+def test_logs_tab_renders_dataframe_with_log_columns():
+    """mock 模式 → 日誌以 st.dataframe 呈現，欄位為 時間/等級/模組/訊息/Request ID。"""
+    import pandas as pd
+
+    at = _open_system_management(Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN))
+    assert not at.exception
+    assert len(at.dataframe) >= 1
+    df = pd.DataFrame(at.dataframe[0].value)
+    for col in ["時間", "等級", "模組", "訊息", "Request ID"]:
+        assert col in df.columns
+
+
+# --- 14. 「下一頁」在 next_cursor=None 時禁用 ---
+
+def test_logs_next_button_disabled_when_no_next_cursor():
+    """mock 模式 next_cursor 恆為 None → 「下一頁」按鈕禁用；「上一頁」棧空也禁用。"""
+    at = _open_system_management(Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN))
+    assert not at.exception
+    next_btn = next(b for b in at.button if b.key == "admin_log_next_cursor")
+    prev_btn = next(b for b in at.button if b.key == "admin_log_prev_cursor")
+    assert next_btn.proto.disabled is True
+    assert prev_btn.proto.disabled is True
+
+
+# --- 15. 等級篩選 WARNING → 只顯示 WARNING ---
+
+def test_logs_level_filter_shows_only_matching_rows():
+    import pandas as pd
+
+    at = _open_system_management(Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN))
+    at.session_state["admin_log_category"] = "WARNING"
+    at.run()
+    assert not at.exception
+    df = pd.DataFrame(at.dataframe[0].value)
+    assert len(df) >= 1
+    assert set(df["等級"]) == {"WARNING"}
+
+
+# --- 16. 篩選改變 → cursor 重設為 None、棧清空 ---
+
+def test_logs_filter_change_resets_cursor():
+    from datetime import date
+
+    at = _open_system_management(Actor("alice", "admin", grade=AdminRole.SUPER_ADMIN))
+    at.session_state["admin_log_cursor"] = "stale-cursor"
+    at.session_state["admin_log_cursor_stack"] = ["a", "b"]
+    at.session_state["admin_log_date_range"] = (date(2024, 1, 1), date(2024, 1, 2))
+    at.run()
+    assert not at.exception
+    assert at.session_state["admin_log_cursor"] is None
+    assert at.session_state["admin_log_cursor_stack"] == []
 
 
 # --- 12. DB 狀態為 fragment 且 run_every=1.0 ---

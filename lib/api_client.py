@@ -20,6 +20,8 @@ import httpx
 from lib.models import (
     DEFAULT_SORT,
     ImportResult,
+    LogEntry,
+    LogsPage,
     NotAuthenticated,
     Page,
     PermissionDenied,
@@ -246,6 +248,25 @@ def _to_record(data: dict) -> Record:
         ) from exc
 
 
+def _to_log_entry(data: dict) -> LogEntry:
+    """後端 LogEntry dict → dataclass;契約破壞時轉 ApiError(同 _to_record 慣例)。"""
+    try:
+        return LogEntry(
+            ts=int(data["ts"]),
+            level=data["level"],
+            logger=data["logger"],
+            message=data["message"],
+            request_id=data.get("request_id"),
+            module=data.get("module"),
+            func=data.get("func"),
+            line=data.get("line"),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApiError(
+            "系統資料異常(後端契約破壞)", status=None, request_id=get_current()
+        ) from exc
+
+
 class ApiDataSource:
     """實作 DataSource 介面,呼叫 FastAPI 業務 API(§6 端點對應)。"""
 
@@ -303,6 +324,36 @@ class ApiDataSource:
 
     def delete_record(self, record_id: int, actor: Any) -> None:
         self._c.request("DELETE", self._url(f"/records/{record_id}"))
+
+    def get_logs(
+        self,
+        level: Optional[str] = None,
+        since_ms: Optional[int] = None,
+        until_ms: Optional[int] = None,
+        logger_name: Optional[str] = None,
+        request_id: Optional[str] = None,
+        cursor: Optional[str] = None,
+        limit: int = 100,
+    ) -> LogsPage:
+        """GET /monitoring/logs（cursor 分頁）；未指定的篩選不進 query。"""
+        params: dict = {"limit": limit}
+        if level:
+            params["level"] = level
+        if since_ms is not None:
+            params["since"] = since_ms
+        if until_ms is not None:
+            params["until"] = until_ms
+        if logger_name:
+            params["logger"] = logger_name
+        if request_id:
+            params["request_id"] = request_id
+        if cursor:
+            params["cursor"] = cursor
+        data = self._c.request("GET", self._url("/monitoring/logs"), params=params)
+        return LogsPage(
+            items=[_to_log_entry(item) for item in data.get("items", [])],
+            next_cursor=data.get("next_cursor"),
+        )
 
     def bulk_create(self, rows: list, actor: Any) -> ImportResult:
         data = self._c.request("POST", self._url("/records/bulk"), json={"rows": rows})

@@ -69,6 +69,28 @@ class Page:
 
 
 @dataclass
+class LogEntry:
+    """後端 GET /monitoring/logs 的一筆伺服器日誌（Python logging 基礎設施日誌）。"""
+
+    ts: int               # epoch ms（UTC）
+    level: str            # "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+    logger: str           # Python logger name
+    message: str
+    request_id: Optional[str] = None
+    module: Optional[str] = None
+    func: Optional[str] = None
+    line: Optional[int] = None
+
+
+@dataclass
+class LogsPage:
+    """游標分頁封套（對應後端 Page[LogEntry]）。"""
+
+    items: list  # List[LogEntry]
+    next_cursor: Optional[str] = None
+
+
+@dataclass
 class RowError:
     row_index: int  # 0-based(對應輸入檔第幾列)
     reason: str

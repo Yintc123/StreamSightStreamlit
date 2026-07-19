@@ -383,3 +383,74 @@ def test_list_records_analytics_size_5000_with_date():
     make_ds(handler).list_records(size=5000, date_from=date(2026, 1, 1))
     assert "size=5000" in captured["url"]
     assert "date_from=2026-01-01" in captured["url"]
+
+
+# --- get_logs（GET /monitoring/logs，server-log.md §3.1） ---
+
+def test_get_logs_returns_logspage_with_entries_and_cursor():
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={
+            "items": [{
+                "ts": 1704067200000, "level": "INFO",
+                "logger": "app.api.routers.auth", "message": "login success",
+                "request_id": "req-001",
+            }],
+            "next_cursor": "123-0",
+        })
+
+    page = make_ds(handler).get_logs()
+    assert captured["url"].startswith("http://api/monitoring/logs")
+    assert page.next_cursor == "123-0"
+    assert len(page.items) == 1
+    entry = page.items[0]
+    assert entry.ts == 1704067200000
+    assert entry.level == "INFO"
+    assert entry.logger == "app.api.routers.auth"
+    assert entry.request_id == "req-001"
+
+
+def test_get_logs_passes_filters_as_query():
+    captured = {}
+
+    def handler(request):
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json={"items": [], "next_cursor": None})
+
+    make_ds(handler).get_logs(level="ERROR", since_ms=1000, until_ms=2000)
+    assert captured["params"]["level"] == "ERROR"
+    assert captured["params"]["since"] == "1000"
+    assert captured["params"]["until"] == "2000"
+
+
+def test_get_logs_passes_cursor_and_limit():
+    captured = {}
+
+    def handler(request):
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json={"items": [], "next_cursor": None})
+
+    make_ds(handler).get_logs(cursor="123-0", limit=50)
+    assert captured["params"]["cursor"] == "123-0"
+    assert captured["params"]["limit"] == "50"
+
+
+def test_get_logs_omits_unset_filters():
+    """未指定的篩選不出現在 query（後端以缺席為不篩選）。"""
+    captured = {}
+
+    def handler(request):
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json={"items": [], "next_cursor": None})
+
+    make_ds(handler).get_logs()
+    assert "level" not in captured["params"]
+    assert "since" not in captured["params"]
+    assert "cursor" not in captured["params"]
+
+
+def test_get_logs_500_raises_apierror():
+    with pytest.raises(ApiError):
+        make_ds(json_handler(500, {"error": {"message": "boom"}})).get_logs()

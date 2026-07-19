@@ -3,7 +3,10 @@ from __future__ import annotations
 from lib.system_management import (
     color_log_level,
     format_db_size,
+    date_range_to_ms,
+    date_to_epoch_ms,
     fetch_infra_snapshot,
+    format_log_ts,
     format_percent,
     parse_infra_snapshot,
     seed_db_status,
@@ -126,22 +129,85 @@ def test_fetch_infra_snapshot_missing_snapshots_key_returns_all_none():
     assert result == {"cpu_percent": None, "memory_percent": None, "db_connections": None}
 
 
+# --- format_log_ts ---
+
+def test_format_log_ts_epoch_2024():
+    assert format_log_ts(1704067200000) == "2024-01-01 00:00:00"
+
+
+def test_format_log_ts_epoch_zero():
+    assert format_log_ts(0) == "1970-01-01 00:00:00"
+
+
+# --- date_to_epoch_ms / date_range_to_ms ---
+
+def test_date_to_epoch_ms_2024_new_year():
+    from datetime import date
+
+    assert date_to_epoch_ms(date(2024, 1, 1)) == 1704067200000
+
+
+def test_date_range_to_ms_same_day_covers_full_day():
+    """until = 當日 23:59:59.999 → 差值恰為 86399999 ms。"""
+    from datetime import date
+
+    since_ms, until_ms = date_range_to_ms(date(2024, 1, 1), date(2024, 1, 1))
+    assert since_ms == 1704067200000
+    assert until_ms - since_ms == 86_399_999
+
+
+# --- log_entries_to_rows ---
+
+def test_log_entries_to_rows_maps_display_columns():
+    from lib.models import LogEntry
+    from lib.system_management import log_entries_to_rows
+
+    entries = [LogEntry(
+        ts=1704067200000, level="INFO", logger="app.api.routers.auth",
+        message="login success", request_id="req-001",
+    )]
+    rows = log_entries_to_rows(entries)
+    assert rows == [{
+        "時間": "2024-01-01 00:00:00",
+        "等級": "INFO",
+        "模組": "app.api.routers.auth",
+        "訊息": "login success",
+        "Request ID": "req-001",
+    }]
+
+
+def test_log_entries_to_rows_empty():
+    from lib.system_management import log_entries_to_rows
+
+    assert log_entries_to_rows([]) == []
+
+
+def test_log_entries_to_rows_none_request_id_shows_dash():
+    from lib.models import LogEntry
+    from lib.system_management import log_entries_to_rows
+
+    entries = [LogEntry(ts=0, level="WARNING", logger="x", message="m", request_id=None)]
+    assert log_entries_to_rows(entries)[0]["Request ID"] == "—"
+
+
 # --- seed functions deterministic ---
 
-def test_seed_logs_returns_list_with_required_keys():
+def test_seed_logs_returns_log_entries():
+    """seed_logs 回傳 LogEntry list（對齊後端 schema），各項 level 合法。"""
+    from lib.models import LogEntry
+
     logs = seed_logs()
     assert isinstance(logs, list)
     assert len(logs) >= 1
+    valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     for log in logs:
-        assert "time" in log
-        assert "user" in log
-        assert "action" in log
-        assert "result" in log
-        assert "level" in log
+        assert isinstance(log, LogEntry)
+        assert log.level in valid_levels
+        assert isinstance(log.ts, int)
 
 
 def test_seed_logs_includes_all_levels():
-    levels = {l["level"] for l in seed_logs()}
+    levels = {l.level for l in seed_logs()}
     assert "INFO" in levels
     assert "WARNING" in levels
     assert "ERROR" in levels
