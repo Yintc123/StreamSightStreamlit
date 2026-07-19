@@ -445,7 +445,13 @@ html[data-theme="dark"] [data-testid="stExpandSidebarButton"] button:hover {
 
 /* ── Sidebar Nav ─────────────────────────────────────────────────────────── */
 
-/* 側欄背景：覆蓋 config.toml secondaryBackgroundColor #f1f5f9 */
+/* 側欄背景 + 文字 cascade 起點：
+ * color 設在 section 層，讓所有後代（含 Streamlit 自行渲染的 <p>/<span>）
+ * 都能繼承深色值；具體元素的覆寫規則在後方以更高特異度勝出。 */
+html[data-theme="dark"] section[data-testid="stSidebar"] {
+    color: rgba(230, 237, 246, 0.72);                 /* ink-AA */
+}
+
 html[data-theme="dark"] section[data-testid="stSidebar"] > div {
     background-color: #151c2b;                        /* surface-card */
 }
@@ -459,7 +465,9 @@ html[data-theme="dark"] [data-testid="stSidebarNavLink"]:hover {
     color: rgba(230, 237, 246, 0.72);
 }
 
-html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"] {
+html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"],
+html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"] p,
+html[data-theme="dark"] [data-testid="stSidebarNavLink"][aria-current="page"] span {
     background-color: rgba(230, 237, 246, 0.14);      /* nav-active */
     color: rgba(230, 237, 246, 0.95);                 /* ink-AAA */
 }
