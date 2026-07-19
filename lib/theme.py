@@ -16,47 +16,9 @@ THEME_COOKIE_MAX_AGE = 31_536_000  # 1 year（對齊 Frontend schema.ts）
 # 對齊規格書 docs/specs/theme-toggle.md §5.2
 _THEME_JS = r"""
 (function () {
-  var COOKIE = 'theme';
-  var MAX_AGE = 31536000;
-  var par = window.parent;
-  var pdoc = par.document;
-
-  function readCookie() {
-    var m = pdoc.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
-    return m && (m[1] === 'light' || m[1] === 'dark') ? m[1] : 'light';
-  }
-
-  function applyTheme(t) {
-    pdoc.documentElement.dataset.theme = t;
-    pdoc.cookie = COOKIE + '=' + t + '; Max-Age=' + MAX_AGE + '; Path=/; SameSite=Lax';
-  }
-
-  function enableTransition() {
-    pdoc.documentElement.setAttribute('data-theme-ready', '');
-  }
-
-  function syncSwitch(t) {
-    var sw = pdoc.querySelector('.ss-topbar__theme-switch');
-    if (!sw) return;
-    sw.setAttribute('aria-checked', t === 'dark' ? 'true' : 'false');
-  }
-
-  var initial = readCookie();
-  applyTheme(initial);
-  syncSwitch(initial);
-  enableTransition();
-
-  if (!par.__ssThemeReady) {
-    par.__ssThemeReady = true;
-    pdoc.addEventListener('click', function (e) {
-      var sw = e.target.closest('.ss-topbar__theme-switch');
-      if (!sw) return;
-      var current = pdoc.documentElement.dataset.theme || 'light';
-      var next = current === 'light' ? 'dark' : 'light';
-      applyTheme(next);
-      syncSwitch(next);
-    });
-  }
+  var pdoc = window.parent.document;
+  pdoc.documentElement.dataset.theme = 'light';
+  pdoc.documentElement.setAttribute('data-theme-ready', '');
 })();
 """
 

@@ -118,48 +118,30 @@ def test_username_element_has_class(actor):
     assert "alice" in surrounding
 
 
-# ── 右側：ThemeToggle（開關模式）────────────────────────────────────────────────
+# ── 右側：ThemeToggle（icon 按鈕，功能停用中）────────────────────────────────────
 
-def test_theme_switch_has_class(actor):
-    """ThemeToggle 開關有 ss-topbar__theme-switch class。"""
+def test_theme_btn_has_class(actor):
+    """ThemeToggle 按鈕有 ss-topbar__theme-btn class。"""
     html = _build_topbar_html(actor)
-    assert "ss-topbar__theme-switch" in html
+    assert "ss-topbar__theme-btn" in html
 
 
-def test_theme_switch_has_role_switch(actor):
-    """ThemeToggle 使用 role='switch'（語意正確的開關角色）。"""
+def test_theme_btn_contains_svg(actor):
+    """ThemeToggle 按鈕內含 SVG icon。"""
     html = _build_topbar_html(actor)
-    assert 'role="switch"' in html
+    assert "<svg" in html
 
 
-def test_theme_switch_has_static_aria_label(actor):
-    """ThemeToggle aria-label 為靜態 '深色模式'（描述開關控制的功能，不隨狀態變動）。"""
-    html = _build_topbar_html(actor)
-    assert 'aria-label="深色模式"' in html
-
-
-def test_theme_switch_has_thumb(actor):
-    """ThemeToggle 含 thumb 子元素（ss-topbar__theme-switch-thumb）。"""
-    html = _build_topbar_html(actor)
-    assert "ss-topbar__theme-switch-thumb" in html
-
-
-def test_theme_switch_aria_checked_false_when_light(actor):
-    """light mode（預設）：aria-checked='false'（開關關閉 = 白天主題）。"""
+def test_theme_btn_shows_sun_icon(actor):
+    """白天主題顯示太陽（circle）icon，非月亮（path）。"""
     html = _build_topbar_html(actor, theme="light")
-    assert 'aria-checked="false"' in html
+    assert "<circle" in html
 
 
-def test_theme_switch_aria_checked_true_when_dark(actor):
-    """dark mode：aria-checked='true'（開關開啟 = 夜間主題）。"""
-    html = _build_topbar_html(actor, theme="dark")
-    assert 'aria-checked="true"' in html
-
-
-def test_theme_switch_default_is_light(actor):
-    """theme 未傳時預設 light（開關預設關閉，走白天主題）。"""
+def test_theme_btn_is_disabled(actor):
+    """ThemeToggle 目前為停用狀態（disabled 屬性）。"""
     html = _build_topbar_html(actor)
-    assert 'aria-checked="false"' in html
+    assert "disabled" in html
 
 
 # ── 右側：登出按鈕 ────────────────────────────────────────────────────────────
