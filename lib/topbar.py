@@ -36,11 +36,22 @@ _MOON_SVG = (
 )
 
 
-def _build_topbar_html(actor: Actor, cms_base_url: str = "", theme: str = "light") -> str:
+def _build_topbar_html(
+    actor: Actor,
+    cms_base_url: str = "",
+    theme: str = "light",
+    enable_theme_toggle: bool = False,
+) -> str:
     """純函式：產生 TopBar HTML 字串（不依賴 Streamlit，可單元測試）。"""
     cms_href = cms_base_url if cms_base_url else "#"
     username = _html.escape(actor.username) if actor else ""
     icon = _SUN_SVG if theme == "light" else _MOON_SVG
+    theme_btn = (
+        f'<button class="ss-topbar__theme-btn" type="button" disabled '
+        f'aria-label="切換為深色">{icon}</button>'
+        if enable_theme_toggle
+        else ""
+    )
 
     return (
         '<div class="ss-topbar">'
@@ -52,14 +63,21 @@ def _build_topbar_html(actor: Actor, cms_base_url: str = "", theme: str = "light
         "</nav>"
         '<div class="ss-topbar__right">'
         f'<span class="ss-topbar__username">{username}</span>'
-        f'<button class="ss-topbar__theme-btn" type="button" disabled '
-        f'aria-label="切換為深色">{icon}</button>'
+        f"{theme_btn}"
         '<button class="ss-topbar__sysitem" type="button">登出</button>'
         "</div>"
         "</div>"
     )
 
 
-def render_topbar(actor: Actor, cms_base_url: str = "", theme: str = "light") -> None:
+def render_topbar(
+    actor: Actor,
+    cms_base_url: str = "",
+    theme: str = "light",
+    enable_theme_toggle: bool = False,
+) -> None:
     """TopBar 注入頁面頂端（position:fixed；CSS 佔位補償見 styles/main.css）。"""
-    st.markdown(_build_topbar_html(actor, cms_base_url, theme), unsafe_allow_html=True)
+    st.markdown(
+        _build_topbar_html(actor, cms_base_url, theme, enable_theme_toggle),
+        unsafe_allow_html=True,
+    )

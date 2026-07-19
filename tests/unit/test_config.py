@@ -209,3 +209,19 @@ def test_token_auth_config_defaults():
     s = get_settings()
     assert s.token_refresh_threshold_seconds == 60
     assert s.introspection_cache_ttl_seconds == 30
+
+
+# --- 功能開關 ---
+
+def test_enable_theme_toggle_defaults_false():
+    """ENABLE_THEME_TOGGLE 預設 False（關閉）；0 = 關 / 1 = 開。"""
+    s = get_settings()
+    assert s.enable_theme_toggle is False
+
+
+def test_enable_theme_toggle_can_be_set_true(monkeypatch):
+    """ENABLE_THEME_TOGGLE=1 → True。"""
+    monkeypatch.setenv("ENABLE_THEME_TOGGLE", "1")
+    s = get_settings()
+    assert s.enable_theme_toggle is True
+

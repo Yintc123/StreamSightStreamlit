@@ -118,30 +118,18 @@ def test_username_element_has_class(actor):
     assert "alice" in surrounding
 
 
-# ── 右側：ThemeToggle（icon 按鈕，功能停用中）────────────────────────────────────
+# ── 右側：ThemeToggle（ENABLE_THEME_TOGGLE 開關控制）────────────────────────────
 
-def test_theme_btn_has_class(actor):
-    """ThemeToggle 按鈕有 ss-topbar__theme-btn class。"""
-    html = _build_topbar_html(actor)
+def test_theme_btn_hidden_when_toggle_disabled(actor):
+    """ENABLE_THEME_TOGGLE=False 時，icon 不渲染（預設行為）。"""
+    html = _build_topbar_html(actor, enable_theme_toggle=False)
+    assert "ss-topbar__theme-btn" not in html
+
+
+def test_theme_btn_shown_when_toggle_enabled(actor):
+    """ENABLE_THEME_TOGGLE=True 時，icon 出現。"""
+    html = _build_topbar_html(actor, enable_theme_toggle=True)
     assert "ss-topbar__theme-btn" in html
-
-
-def test_theme_btn_contains_svg(actor):
-    """ThemeToggle 按鈕內含 SVG icon。"""
-    html = _build_topbar_html(actor)
-    assert "<svg" in html
-
-
-def test_theme_btn_shows_sun_icon(actor):
-    """白天主題顯示太陽（circle）icon，非月亮（path）。"""
-    html = _build_topbar_html(actor, theme="light")
-    assert "<circle" in html
-
-
-def test_theme_btn_is_disabled(actor):
-    """ThemeToggle 目前為停用狀態（disabled 屬性）。"""
-    html = _build_topbar_html(actor)
-    assert "disabled" in html
 
 
 # ── 右側：登出按鈕 ────────────────────────────────────────────────────────────

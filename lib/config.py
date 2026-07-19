@@ -38,6 +38,7 @@ class BaseAppSettings(BaseSettings):
     log_level: str = "DEBUG"  # 各環境子類覆寫;大寫(§3.1、§4)
 
     use_mock: bool = True  # True → mock data + mock auth；False → api + bff（對齊前端 USE_MOCK）
+    enable_theme_toggle: bool = False  # True → 顯示主題切換 icon；False → 隱藏（0/1）
 
     # BFF(introspection 目標)/ FastAPI(業務 API 目標)base URL(§3.3、§3.4)
     bff_base_url: str = "http://localhost:3000"
