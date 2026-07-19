@@ -11,6 +11,7 @@ from lib.config import AppEnv, get_settings
 from lib.models import NotAuthenticated
 from lib.nav import build_pages, render_dev_switcher
 from lib.request_id import init_logging
+from lib.sidebar import inject_sidebar_sync_js
 from lib.state import clear_auth, pop_logout_reason, set_logout_reason
 from lib.theme import inject_theme_js, init_theme_state, load_css
 from lib.topbar import render_topbar
@@ -83,6 +84,9 @@ render_topbar(  # ⑥ 自訂頂列
 )
 inject_theme_js(enable_theme_toggle=_enable_toggle, is_prod=_is_prod)  # ⑦ ThemeToggle JS（冪等）
 idle.inject_idle_js()  # ⑦′ 注入閒置計時器 JS（冪等；純 client-side 偵測滑鼠/鍵盤）
+inject_sidebar_sync_js(  # ⑦″ 側欄寬度 cookie 橋接（kill-switch；sidebar-width-sync.md §3.4）
+    enabled=get_settings().enable_sidebar_width_sync, is_prod=_is_prod
+)
 
 try:
     pages = build_pages(actor)  # ⑦ 依 actor.grade 動態組頁清單(見 §5)

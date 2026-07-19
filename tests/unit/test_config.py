@@ -229,6 +229,19 @@ def test_enable_theme_toggle_can_be_set_true(monkeypatch):
     assert s.enable_theme_toggle is True
 
 
+def test_enable_sidebar_width_sync_defaults_false():
+    """ENABLE_SIDEBAR_WIDTH_SYNC 預設 False(kill-switch 關);0 = 關 / 1 = 開。"""
+    s = get_settings()
+    assert s.enable_sidebar_width_sync is False
+
+
+def test_enable_sidebar_width_sync_can_be_set_true(monkeypatch):
+    """ENABLE_SIDEBAR_WIDTH_SYNC=1 → True。"""
+    monkeypatch.setenv("ENABLE_SIDEBAR_WIDTH_SYNC", "1")
+    s = get_settings()
+    assert s.enable_sidebar_width_sync is True
+
+
 # --- bff_public_base_url:瀏覽器導向用 base URL（docker 內部/對外分離） ---
 
 def test_bff_public_base_url_defaults_to_bff_base_url(monkeypatch):
