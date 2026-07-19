@@ -47,6 +47,7 @@ class BaseAppSettings(BaseSettings):
     bff_session_path: str = "/api/auth/session"  # introspection 端點
     bff_logout_path: str = "/api/auth/logout"
     bff_login_path: str = "/login"  # Next.js 登入頁路徑(actor is None 時跳轉)
+    bff_cms_path: str = "/cms"  # CMS 根路徑;TopBar 品牌 & 管理後台連結目標
     streamlit_origin: str = "http://localhost:8501"  # logout Origin header(015 §7.1B)
     role_admin_value: int = 1  # role 數值 → admin,其餘 user;待與前端 Role enum 對齊
 

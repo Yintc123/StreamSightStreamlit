@@ -109,3 +109,18 @@ def test_topbar_rendered_in_app():
     assert not at.exception
     markdowns = [m.value for m in at.markdown]
     assert any("ss-topbar" in m for m in markdowns)
+
+
+def test_topbar_cms_url_always_passed(monkeypatch):
+    """mock 模式でも bff_base_url+bff_cms_path の URL が TopBar に渡される。
+
+    AUTH_MODE=mock であっても品牌・管理後台連結が '#' に落ちず、
+    bff_base_url(localhost:3000)/cms を href に含むことを確認する。
+    """
+    monkeypatch.setenv("AUTH_MODE", "mock")
+    at = AppTest.from_file(APP_PATH)
+    at.run()
+    assert not at.exception
+    markdowns = [m.value for m in at.markdown]
+    topbar_html = next(m for m in markdowns if '<div class="ss-topbar">' in m)
+    assert "localhost:3000/cms" in topbar_html

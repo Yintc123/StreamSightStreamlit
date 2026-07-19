@@ -150,6 +150,12 @@ def test_bff_login_path_default():
     assert s.bff_login_path == "/login"
 
 
+def test_bff_cms_path_default():
+    """bff_cms_path 預設 /cms（TopBar 品牌 & 管理後台連結目標；見 topbar-cms-link.md §2.1）。"""
+    s = get_settings()
+    assert s.bff_cms_path == "/cms"
+
+
 # --- streamlit_origin / bff_csrf_path(config §3.3;015 §7.1B) ---
 
 def test_streamlit_origin_default():

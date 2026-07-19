@@ -219,7 +219,7 @@ CmsTopBar.tsx                       ss-topbar（對應 Streamlit）
 
 #### 注意事項
 
-- **資料平台 tab 永遠 active**（Streamlit 即為 資料平台）；**管理後台**連結至 `bff_base_url/cms`（mock 模式下降回 `#`）。
+- **資料平台 tab 永遠 active**（Streamlit 即為 資料平台）；**管理後台**與**品牌 StreamSight**均連結至 `bff_base_url/cms`（mock 模式下降回 `#`；對齊 CmsTopBar.tsx `<Link href="/cms">`）。詳見 [topbar-cms-link.md](topbar-cms-link.md)。
 - **username XSS 防護**：`_build_topbar_html` 以 `html.escape()` 處理 `actor.username`。
 - **ThemeToggle**：目前只渲染 light mode 太陽圖示（SVG 20px），`aria-label="切換為深色"`；深色切換功能待後續 cycle 接入。
 - **登出按鈕**：目前視覺佔位；bff 模式的 CSRF logout 流程待後續 cycle 實作。

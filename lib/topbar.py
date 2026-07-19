@@ -34,10 +34,10 @@ def _build_topbar_html(actor: Actor, cms_base_url: str = "") -> str:
 
     return (
         '<div class="ss-topbar">'
-        f'<a class="ss-topbar__brand" href="#">Stream'
+        f'<a class="ss-topbar__brand" href="{cms_href}" target="_self">Stream'
         f'<span class="ss-topbar__accent">Sight</span></a>'
         '<nav class="ss-topbar__nav">'
-        f'<a class="ss-topbar__sysitem" href="{cms_href}">管理後台</a>'
+        f'<a class="ss-topbar__sysitem" href="{cms_href}" target="_self">管理後台</a>'
         '<span class="ss-topbar__sysitem ss-topbar__sysitem--active">資料平台</span>'
         "</nav>"
         '<div class="ss-topbar__right">'

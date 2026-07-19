@@ -18,6 +18,26 @@ def actor():
 
 # ── 品牌 ──────────────────────────────────────────────────────────────────────
 
+def test_brand_href_from_base_url(actor):
+    """cms_base_url 非空時，品牌 <a> 元素本身的 href 含有該 URL（對齊 CmsTopBar.tsx <Link href="/cms">）。"""
+    html = _build_topbar_html(actor, cms_base_url="http://localhost:3000/cms")
+    assert 'class="ss-topbar__brand" href="http://localhost:3000/cms"' in html
+
+
+def test_brand_link_same_tab(actor):
+    """品牌 <a> 有 target="_self"（Streamlit react-markdown 預設 target=N||"_blank"，須明確覆蓋）。"""
+    html = _build_topbar_html(actor, cms_base_url="http://localhost:3000/cms")
+    idx = html.index('class="ss-topbar__brand"')
+    surrounding = html[idx: idx + 200]
+    assert 'target="_self"' in surrounding
+
+
+def test_brand_href_fallback_to_hash(actor):
+    """cms_base_url 為空字串時，品牌 <a> 元素本身的 href 降回 '#'（mock 環境安全預設）。"""
+    html = _build_topbar_html(actor, cms_base_url="")
+    assert 'class="ss-topbar__brand" href="#"' in html
+
+
 def test_brand_stream_text(actor):
     """'Stream' 文字存在且不在 accent span 內。"""
     html = _build_topbar_html(actor)
@@ -54,6 +74,14 @@ def test_cms_tab_href_from_base_url(actor):
     """cms_base_url 非空時，'管理後台' href 含有該 URL。"""
     html = _build_topbar_html(actor, cms_base_url="http://localhost:3000/cms")
     assert "http://localhost:3000/cms" in html
+
+
+def test_cms_tab_link_same_tab(actor):
+    """管理後台 <a> 有 target="_self"（Streamlit react-markdown 預設 target=N||"_blank"，須明確覆蓋）。"""
+    html = _build_topbar_html(actor, cms_base_url="http://localhost:3000/cms")
+    idx = html.index("管理後台")
+    before = html[max(0, idx - 250): idx]
+    assert 'target="_self"' in before
 
 
 def test_cms_tab_href_fallback_to_hash(actor):

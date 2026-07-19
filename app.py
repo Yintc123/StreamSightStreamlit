@@ -37,7 +37,7 @@ if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
 _s2 = get_settings()
-_cms_url = f"{_s2.bff_base_url}/cms" if _s2.auth_mode == "bff" else ""
+_cms_url = f"{_s2.bff_base_url}{_s2.bff_cms_path}"
 render_topbar(actor, cms_base_url=_cms_url)  # ⑥ 自訂頂列（全模式）
 
 try:
