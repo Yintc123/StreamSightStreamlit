@@ -37,8 +37,7 @@ class BaseAppSettings(BaseSettings):
     app_commit: str = ""
     log_level: str = "DEBUG"  # 各環境子類覆寫;大寫(§3.1、§4)
 
-    data_source: str = "mock"
-    auth_mode: str = "mock"
+    use_mock: bool = True  # True → mock data + mock auth；False → api + bff（對齊前端 USE_MOCK）
 
     # BFF(introspection 目標)/ FastAPI(業務 API 目標)base URL(§3.3、§3.4)
     bff_base_url: str = "http://localhost:3000"
@@ -79,21 +78,8 @@ class BaseAppSettings(BaseSettings):
                 if "localhost" in url or "127.0.0.1" in url:
                     raise ValueError(f"{self.app_env.value} 不可用 localhost:{name}={url!r}")
         # §5.4:production 禁 mock。
-        if self.app_env == AppEnv.PRODUCTION and (
-            self.data_source == "mock" or self.auth_mode == "mock"
-        ):
-            raise ValueError("production 禁用 mock(DATA_SOURCE / AUTH_MODE 皆須非 mock)")
-        return self
-
-    @model_validator(mode="after")
-    def _check_flag_combo(self) -> "BaseAppSettings":
-        # 硬性守衛(§5.2):DATA_SOURCE=api 必須搭 AUTH_MODE=bff。
-        # api+mock 無 token → 業務 API 必 401,故啟動即拒絕。
-        if self.data_source == "api" and self.auth_mode == "mock":
-            raise ValueError(
-                "無效組合:DATA_SOURCE=api 需搭 AUTH_MODE=bff(業務 API 需 JWT);"
-                "api+mock 為無效組合"
-            )
+        if self.app_env == AppEnv.PRODUCTION and self.use_mock:
+            raise ValueError("production 禁用 mock(USE_MOCK 必須為 false/0)")
         return self
 
 
@@ -102,8 +88,7 @@ class LocalSettings(BaseAppSettings):
 
 
 class DevelopmentSettings(BaseAppSettings):
-    data_source: str = "api"
-    auth_mode: str = "bff"
+    use_mock: bool = False
 
 
 class StageSettings(DevelopmentSettings):

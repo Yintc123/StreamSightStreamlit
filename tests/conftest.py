@@ -5,7 +5,7 @@ import pytest
 # 與 lib/config.py 相關的環境變數：每個測試前一律清空，確保 hermetic（不被本機 shell / .env 汙染）。
 _CONFIG_ENV_KEYS = [
     "APP_ENV", "APP_NAME", "APP_VERSION", "APP_COMMIT", "LOG_LEVEL",
-    "DATA_SOURCE", "AUTH_MODE",
+    "USE_MOCK",
     "BFF_BASE_URL", "BFF_SESSION_PATH", "BFF_LOGOUT_PATH", "BFF_LOGIN_PATH", "SESSION_COOKIE_NAME",
     "FASTAPI_BASE_URL",
     "HTTP_CONNECT_TIMEOUT_SECONDS", "HTTP_READ_TIMEOUT_SECONDS",

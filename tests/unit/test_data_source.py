@@ -50,9 +50,3 @@ def test_api_datasource_shares_http_client_across_calls(monkeypatch, fake_sessio
     assert ds1._c is ds2._c
 
 
-def test_api_plus_mock_combo_raises_at_startup(monkeypatch):
-    # §9 測 9:無效組合由 config 守衛在 get_settings() 啟動時擋下
-    monkeypatch.setenv("DATA_SOURCE", "api")
-    monkeypatch.setenv("AUTH_MODE", "mock")
-    with pytest.raises(ValueError):
-        get_data_source()

@@ -33,7 +33,7 @@ if actor is None:  # ④ 未登入(僅 AUTH_MODE=bff 會發生)→ 跳轉 Next.j
     )
     st.stop()
 
-if get_settings().auth_mode == "mock":  # ⑤ 開發切換器(僅 mock)
+if get_settings().use_mock:  # ⑤ 開發切換器(僅 mock)
     actor = render_dev_switcher(actor)
 
 _s2 = get_settings()

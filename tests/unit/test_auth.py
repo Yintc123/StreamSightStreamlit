@@ -20,7 +20,7 @@ def fake_session(monkeypatch):
 
 @pytest.fixture
 def bff_mode(monkeypatch):
-    monkeypatch.setenv("AUTH_MODE", "bff")
+    monkeypatch.setenv("USE_MOCK", "0")
 
 
 def _set_cookies(monkeypatch, cookies: dict):

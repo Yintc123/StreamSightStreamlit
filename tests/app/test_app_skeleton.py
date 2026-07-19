@@ -34,7 +34,7 @@ def test_super_admin_can_open_admin_page():
 
 def test_bff_no_actor_redirects_to_login(monkeypatch):
     """bff 模式無 cookie → actor is None → meta refresh 跳轉 Next.js 登入，不顯示任何業務頁。"""
-    monkeypatch.setenv("AUTH_MODE", "bff")
+    monkeypatch.setenv("USE_MOCK", "0")
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not at.exception
@@ -92,8 +92,8 @@ def test_dev_switcher_present_in_mock_mode():
 
 
 def test_dev_switcher_absent_in_bff_mode(monkeypatch):
-    """AUTH_MODE=bff：未登入時立即 redirect，切換器不出現。"""
-    monkeypatch.setenv("AUTH_MODE", "bff")
+    """USE_MOCK=0：未登入時立即 redirect，切換器不出現。"""
+    monkeypatch.setenv("USE_MOCK", "0")
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not any(s.key == "dev_user" for s in at.selectbox)
@@ -114,10 +114,9 @@ def test_topbar_rendered_in_app():
 def test_topbar_cms_url_always_passed(monkeypatch):
     """mock 模式でも bff_base_url+bff_cms_path の URL が TopBar に渡される。
 
-    AUTH_MODE=mock であっても品牌・管理後台連結が '#' に落ちず、
+    USE_MOCK=1（預設）であっても品牌・管理後台連結が '#' に落ちず、
     bff_base_url(localhost:3000)/cms を href に含むことを確認する。
     """
-    monkeypatch.setenv("AUTH_MODE", "mock")
     at = AppTest.from_file(APP_PATH)
     at.run()
     assert not at.exception

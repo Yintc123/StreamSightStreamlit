@@ -28,7 +28,7 @@ _DEFAULT_MOCK_ACTOR = Actor("alice", "admin", grade="super_admin")
 def resolve_actor() -> Optional[Actor]:
     """身分單一出口:吸收 mock / bff 差異,app.py 只看回傳值。"""
     settings = get_settings()
-    if settings.auth_mode == "mock":
+    if settings.use_mock:
         actor = state.get_actor()
         if actor is None:
             actor = Actor(_DEFAULT_MOCK_ACTOR.username, _DEFAULT_MOCK_ACTOR.role, grade=_DEFAULT_MOCK_ACTOR.grade)
@@ -58,8 +58,8 @@ def map_role(raw) -> str:
 
 def get_access_token() -> str:
     """供 api_client 帶 Bearer;取當前 JWT(來源 session_state["access_token"])。"""
-    if get_settings().auth_mode == "mock":
-        raise RuntimeError("AUTH_MODE=mock 無 token")
+    if get_settings().use_mock:
+        raise RuntimeError("USE_MOCK=true 無 token")
     token = state.get_token()
     if token is None:
         raise NotAuthenticated("尚無 access token")
@@ -68,8 +68,8 @@ def get_access_token() -> str:
 
 def refresh_token() -> str:
     """重呼 introspection 換新 token 並回寫;401 時讓 NotAuthenticated 往上拋(reactive refresh)。"""
-    if get_settings().auth_mode == "mock":
-        raise RuntimeError("AUTH_MODE=mock 無 token")
+    if get_settings().use_mock:
+        raise RuntimeError("USE_MOCK=true 無 token")
     _cached_introspect.clear()  # refresh 前清舊快取,確保打到 BFF 取最新 token(auth-flow §4.6)
     data = _introspect()  # 401 → NotAuthenticated 傳播(不在此攔)
     state.set_token(data["accessToken"], data["expiresAt"])
@@ -78,15 +78,15 @@ def refresh_token() -> str:
 
 def raw_cookie() -> Optional[str]:
     """從 st.context.cookies 取加密 session cookie 原值,供 introspection 轉發。"""
-    if get_settings().auth_mode == "mock":
-        raise RuntimeError("AUTH_MODE=mock 無 cookie")
+    if get_settings().use_mock:
+        raise RuntimeError("USE_MOCK=true 無 cookie")
     cookies = getattr(st.context, "cookies", None) or {}
     return cookies.get(get_settings().session_cookie_name)
 
 
 def logout() -> None:
     """登出:mock 僅清狀態;bff 呼叫 BFF logout + 清狀態(try/finally,確保本地一定清)。"""
-    if get_settings().auth_mode == "mock":
+    if get_settings().use_mock:
         state.clear_auth()
         return
     # bff:通知後端 session 失效;無論成功與否都清本地狀態(最佳努力,auth-flow §4.5)

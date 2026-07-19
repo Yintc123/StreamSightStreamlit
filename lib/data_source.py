@@ -38,12 +38,9 @@ class DataSource(Protocol):
 
 
 def get_data_source() -> DataSource:
-    """依 DATA_SOURCE 旗標回傳資料源實作。
-
-    無效組合(api+mock)已於 get_settings() 由 config 守衛啟動時擋下。
-    """
+    """依 USE_MOCK 旗標回傳資料源實作。"""
     settings = get_settings()
-    if settings.data_source == "mock":
+    if settings.use_mock:
         if "mock_records" not in st.session_state:
             st.session_state["mock_records"] = make_seed_records()
         return MockDataSource(st.session_state["mock_records"])
